@@ -1,0 +1,28 @@
+{
+  "name": "monty-dev",
+  "version": "0.1.1",
+  "description": "Live AI prompt feed and token leaderboard for your engineering team. Works with Claude Code and Codex CLI.",
+  "license": "MIT",
+  "bin": {
+    "monty": "monty.js"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "ai",
+    "prompt",
+    "leaderboard",
+    "developer-tools",
+    "cli"
+  ],
+  "files": [
+    "monty.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ethangoodhart/monty.git"
+  }
+}
