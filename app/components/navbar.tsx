@@ -20,7 +20,7 @@ export function Navbar() {
       <nav className="mx-auto flex h-[5.25rem] max-w-[1280px] items-center gap-4 px-6 lg:px-10">
         <div className="flex flex-1 items-center gap-6">
           <Link href="/" className="flex items-center"><MontyLogo /></Link>
-          <div className="hidden sm:flex items-center gap-4 text-sm">
+          <div className="hidden sm:flex items-center gap-4 text-sm ml-2">
             <Link href="/feed" className="text-[#999] hover:text-[#111] font-medium transition-colors">Live</Link>
             <Link href="/leaderboard" className="text-[#999] hover:text-[#111] font-medium transition-colors">Tokens</Link>
           </div>

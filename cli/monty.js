@@ -66,8 +66,14 @@ async function install(args) {
   console.log(`Claude hook: ${claudePath}`);
   console.log(`Codex hook: ${codexPath}`);
   console.log(`Codex telemetry: ${codexConfigPath}`);
+  console.log("");
+
+  if (!options["no-sync"]) {
+    console.log("Syncing prompt history...");
+    await syncHistory(args);
+  }
+
   console.log("Open Claude Code or restart Codex CLI and submit a prompt. It will appear in the Monty feed.");
-  console.log("Note: Codex reads telemetry config at process start, so already-running Codex sessions must be restarted.");
 }
 
 async function captureCommand(args) {
@@ -121,10 +127,17 @@ async function handleStopHook(source, input) {
     let cacheRead = 0;
     let model = null;
     let turnStarted = false;
+    const modifiedFiles = new Set();
 
     for (let i = lines.length - 1; i >= 0; i--) {
       let entry;
       try { entry = JSON.parse(lines[i]); } catch { continue; }
+
+      if (entry.type === "file-history-snapshot" && entry.snapshot?.trackedFileBackups && !turnStarted) {
+        for (const filePath of Object.keys(entry.snapshot.trackedFileBackups)) {
+          modifiedFiles.add(filePath);
+        }
+      }
 
       if (entry.type === "assistant" && entry.message) {
         const usage = entry.message.usage || {};
@@ -134,6 +147,14 @@ async function handleStopHook(source, input) {
         cacheRead += usage.cache_read_input_tokens || 0;
         if (entry.message.model && entry.message.model !== "<synthetic>") model = entry.message.model;
         turnStarted = true;
+
+        for (const block of entry.message.content || []) {
+          if (block.type === "tool_use" && (block.name === "Edit" || block.name === "Write") && block.input?.file_path) {
+            const fp = block.input.file_path;
+            const cwd = input.cwd || process.cwd();
+            modifiedFiles.add(fp.startsWith(cwd) ? fp.slice(cwd.length + 1) : fp);
+          }
+        }
       }
 
       if (entry.type === "user" && entry.message && turnStarted) {
@@ -163,6 +184,7 @@ async function handleStopHook(source, input) {
           output_tokens: totalOutput,
           cache_creation_input_tokens: cacheCreation,
           cache_read_input_tokens: cacheRead,
+          modified_files: Array.from(modifiedFiles),
         }),
         signal: controller.signal,
       });
@@ -264,7 +286,7 @@ async function sendHeartbeat() {
   }
 }
 
-function runWrapped(args) {
+async function runWrapped(args) {
   const [tool, ...toolArgs] = args;
   if (!tool || !["claude", "codex"].includes(tool)) {
     console.error("Usage: monty run <claude|codex> [...args]");
@@ -274,11 +296,24 @@ function runWrapped(args) {
 
   const prompt = inferPromptFromArgs(tool, toolArgs);
   if (prompt) {
-    sendPrompt(tool, { prompt, cwd: process.cwd(), hook_event_name: "WrappedRun" }).catch(() => {});
+    await sendPrompt(tool, { prompt, cwd: process.cwd(), hook_event_name: "WrappedRun" }).catch(() => {});
   }
 
   const result = spawnSync(tool, toolArgs, { stdio: "inherit", env: process.env });
-  process.exit(result.status ?? 1);
+
+  if (tool === "claude") {
+    const transcriptPath = findLatestTranscript(process.cwd());
+    if (transcriptPath) {
+      const sessionId = path.basename(transcriptPath, ".jsonl");
+      await handleStopHook(tool, {
+        session_id: sessionId,
+        transcript_path: transcriptPath,
+        cwd: process.cwd(),
+      }).catch(() => {});
+    }
+  }
+
+  process.exitCode = result.status ?? 1;
 }
 
 async function syncHistory(args) {
@@ -712,6 +747,27 @@ function otelEndpoint(config) {
   if (config.avatarUrl) params.set("avatar", config.avatarUrl);
   if (config.githubLogin) params.set("github", config.githubLogin);
   return `${cleanUrl(config.siteUrl)}/api/otel/v1/logs?${params.toString()}`;
+}
+
+function findLatestTranscript(cwd) {
+  const projectDir = cwd.replace(/\//g, "-");
+  const projectPath = path.join(home, ".claude", "projects", projectDir);
+  if (!fs.existsSync(projectPath)) return null;
+
+  let latest = null;
+  let latestMtime = 0;
+  try {
+    for (const file of fs.readdirSync(projectPath)) {
+      if (!file.endsWith(".jsonl")) continue;
+      const filePath = path.join(projectPath, file);
+      const stat = fs.statSync(filePath);
+      if (stat.mtimeMs > latestMtime) {
+        latestMtime = stat.mtimeMs;
+        latest = filePath;
+      }
+    }
+  } catch {}
+  return latest;
 }
 
 function detectClaudeModel(source) {

@@ -86,6 +86,17 @@ export async function PATCH(request: NextRequest) {
   const cacheCreation = body.cache_creation_input_tokens || 0;
   const cacheRead = body.cache_read_input_tokens || 0;
 
+  const { data: rows } = await supabase
+    .from(PROMPT_EVENTS_TABLE)
+    .select("id")
+    .eq("session_id", body.session_id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (!rows || rows.length === 0) {
+    return NextResponse.json({ updated: 0 });
+  }
+
   const { data, error } = await supabase
     .from(PROMPT_EVENTS_TABLE)
     .update({
@@ -98,12 +109,10 @@ export async function PATCH(request: NextRequest) {
         output_tokens: outputTokens,
         cache_creation_input_tokens: cacheCreation,
         cache_read_input_tokens: cacheRead,
+        modified_files: Array.isArray(body.modified_files) ? body.modified_files : [],
       },
     })
-    .eq("session_id", body.session_id)
-    .eq("prompt", body.prompt)
-    .order("created_at", { ascending: false })
-    .limit(1)
+    .eq("id", rows[0].id)
     .select("*");
 
   if (error) {

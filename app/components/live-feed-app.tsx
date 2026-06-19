@@ -38,6 +38,14 @@ export function LiveFeedApp() {
         const hasTokens = (event.input_tokens || 0) + (event.output_tokens || 0) > 0;
         if (!hasTokens) {
           setRunningIds((prev) => new Set(prev).add(event.id));
+          setTimeout(() => {
+            setRunningIds((prev) => {
+              if (!prev.has(event.id)) return prev;
+              const next = new Set(prev);
+              next.delete(event.id);
+              return next;
+            });
+          }, 10 * 60_000);
         }
         setTimeout(() => {
           setFreshIds((prev) => {
@@ -131,7 +139,7 @@ export function LiveFeedApp() {
         <nav className="mx-auto flex h-[5.25rem] max-w-[1280px] items-center gap-4 px-6 lg:px-10">
           <div className="flex flex-1 items-center gap-6">
             <Link href="/" className="flex items-center"><MontyLogo /></Link>
-            <div className="hidden sm:flex items-center gap-4 text-sm">
+            <div className="hidden sm:flex items-center gap-4 text-sm ml-2">
               <Link href="/feed" className="text-[#111] font-medium">Live</Link>
               <Link href="/leaderboard" className="text-[#999] hover:text-[#111] font-medium transition-colors">Tokens</Link>
             </div>
@@ -209,8 +217,19 @@ function FeedItem({ event, isFresh, isRunning, isFirst }: { event: PromptEvent; 
   const isLong = event.prompt.length > 400 || event.prompt.split("\n").length > 8;
 
   const hasTokens = (event.input_tokens || 0) + (event.output_tokens || 0) > 0;
+  const projectName = event.cwd ? event.cwd.split("/").filter(Boolean).pop() || null : null;
 
   const meta: React.ReactNode[] = [];
+  if (projectName) {
+    meta.push(
+      <span className="flex items-center gap-1">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="shrink-0 text-[#999]">
+          <path d="M1.5 3a1.5 1.5 0 011.5-1.5h3.19a1.5 1.5 0 011.06.44L8.56 3.25a.5.5 0 00.35.15H13a1.5 1.5 0 011.5 1.5v7.6a1.5 1.5 0 01-1.5 1.5H3A1.5 1.5 0 011.5 12.5V3z" stroke="currentColor" strokeWidth="1.2" />
+        </svg>
+        <span className="font-mono">{projectName}</span>
+      </span>
+    );
+  }
   if ((event.source === "claude" || event.source === "codex") && event.model) {
     const src = event.source === "claude"
       ? "https://cdn.worldvectorlogo.com/logos/claude-logo.svg"
@@ -233,7 +252,7 @@ function FeedItem({ event, isFresh, isRunning, isFirst }: { event: PromptEvent; 
     meta.push(formatTokens(nonCachedTokens) + " tokens");
     meta.push(formatCost(computeEventCost(event)));
   }
-  const projectName = event.cwd ? event.cwd.split("/").filter(Boolean).pop() || null : null;
+  const modifiedFiles: string[] = Array.isArray(event.metadata?.modified_files) ? (event.metadata.modified_files as string[]) : [];
 
   return (
     <article
@@ -243,16 +262,6 @@ function FeedItem({ event, isFresh, isRunning, isFirst }: { event: PromptEvent; 
       style={isFresh ? { animation: "feedSlideIn 0.35s ease-out" } : undefined}
     >
       <div className="flex gap-4 py-5">
-        {projectName && (
-          <div className="flex items-center shrink-0 self-start pt-1">
-            <div className="flex items-center gap-1.5 rounded-lg bg-[#f5f5f5] px-2.5 py-1.5">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="shrink-0 text-[#999]">
-                <path d="M1.5 3a1.5 1.5 0 011.5-1.5h3.19a1.5 1.5 0 011.06.44L8.56 3.25a.5.5 0 00.35.15H13a1.5 1.5 0 011.5 1.5v7.6a1.5 1.5 0 01-1.5 1.5H3A1.5 1.5 0 011.5 12.5V3z" stroke="currentColor" strokeWidth="1.2" />
-              </svg>
-              <span className="text-[12px] font-medium text-[#666] max-w-[100px] truncate">{projectName}</span>
-            </div>
-          </div>
-        )}
         <div className="flex flex-col items-center shrink-0 pt-0.5">
           <div className="size-9 overflow-hidden rounded-full bg-gradient-to-br from-[#eee] to-[#ddd]">
             {validAvatarUrl(event.avatar_url) ? (
@@ -306,6 +315,19 @@ function FeedItem({ event, isFresh, isRunning, isFirst }: { event: PromptEvent; 
               </span>
             )}
           </div>
+          {modifiedFiles.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {modifiedFiles.map((file) => {
+                const fileName = file.split("/").pop() || file;
+                return (
+                  <span key={file} className="inline-flex items-center gap-1 rounded-md bg-[#f5f5f5] px-1.5 py-0.5" title={file}>
+                    <FileIcon filename={fileName} />
+                    <span className="text-[11px] font-mono text-[#666]">{fileName}</span>
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </article>
@@ -336,7 +358,7 @@ function PresenceBar({ events }: { events: PromptEvent[] }) {
             <div key={user.name} className="flex flex-col items-center gap-2 shrink-0">
               <div className="relative">
                 {isActive ? <LaptopOpenIcon /> : <LaptopClosedIcon />}
-                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${isActive ? "bg-emerald-400" : "bg-[#ccc]"}`} />
+                <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${isActive ? "bg-emerald-400" : "bg-[#ccc]"}`} />
               </div>
               <div className="flex items-center gap-1.5">
                 {validAvatarUrl(user.avatarUrl) ? (
@@ -443,18 +465,18 @@ function LaptopOpenIcon() {
   }, []);
 
   return (
-    <div className="relative" style={{ width: 72, height: 56 }}>
-      <svg width="72" height="56" viewBox="0 0 72 56" fill="none" className="absolute inset-0 text-[#555]">
-        <rect x="8" y="4" width="56" height="38" rx="3" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M4 46h64" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M28 46l-2 4h20l-2-4" stroke="currentColor" strokeWidth="1.2" fill="none" />
+    <div className="relative" style={{ width: 144, height: 112 }}>
+      <svg width="144" height="112" viewBox="0 0 72 56" fill="none" className="absolute inset-0 text-[#555]">
+        <rect x="8" y="4" width="56" height="38" rx="3" stroke="currentColor" strokeWidth="0.75" />
+        <path d="M4 46h64" stroke="currentColor" strokeWidth="0.75" strokeLinecap="round" />
+        <path d="M28 46l-2 4h20l-2-4" stroke="currentColor" strokeWidth="0.6" fill="none" />
       </svg>
       <canvas
         ref={canvasRef}
-        width={48}
-        height={30}
-        className="absolute rounded-[1px]"
-        style={{ top: 8, left: 12 }}
+        width={96}
+        height={60}
+        className="absolute rounded-[2px]"
+        style={{ top: 16, left: 24 }}
       />
     </div>
   );
@@ -462,11 +484,12 @@ function LaptopOpenIcon() {
 
 function LaptopClosedIcon() {
   return (
-    <div className="relative" style={{ width: 72, height: 56 }}>
-      <svg width="72" height="56" viewBox="0 0 72 56" fill="none" className="text-[#ccc]">
-        <rect x="8" y="30" width="56" height="6" rx="2" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M4 46h64" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M28 46l-2 4h20l-2-4" stroke="currentColor" strokeWidth="1.2" fill="none" />
+    <div className="relative" style={{ width: 144, height: 112 }}>
+      <svg width="144" height="112" viewBox="0 0 72 56" fill="none" className="text-[#ccc]">
+        <rect x="8" y="37" width="56" height="4" rx="1.5" stroke="currentColor" strokeWidth="0.75" />
+        <rect x="8" y="41" width="56" height="5" rx="1.5" stroke="currentColor" strokeWidth="0.75" />
+        <path d="M4 46h64" stroke="currentColor" strokeWidth="0.75" strokeLinecap="round" />
+        <path d="M28 46l-2 4h20l-2-4" stroke="currentColor" strokeWidth="0.6" fill="none" />
       </svg>
     </div>
   );
