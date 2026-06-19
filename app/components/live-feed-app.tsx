@@ -1,16 +1,25 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { MontyLogo, GitHubIcon, CopyIcon, CheckIcon } from "./icons";
 import { getBrowserSupabase, hasBrowserSupabaseConfig } from "@/app/lib/supabase";
 import { PROMPT_EVENTS_TABLE, type PromptEvent, type PromptSource } from "@/app/lib/prompt-events";
 
 const TEAM_ID = process.env.NEXT_PUBLIC_MONTY_TEAM_ID || "default";
+const INSTALL_CMD = "npx monty-cli install";
 const sourceLabels: Record<PromptSource, string> = {
   claude: "Claude Code",
   codex: "Codex CLI",
   manual: "Manual",
   test: "Test",
+};
+const sourceColors: Record<PromptSource, string> = {
+  claude: "bg-orange-50 text-orange-600 border-orange-200/60",
+  codex: "bg-violet-50 text-violet-600 border-violet-200/60",
+  manual: "bg-gray-50 text-gray-600 border-gray-200/60",
+  test: "bg-emerald-50 text-emerald-600 border-emerald-200/60",
 };
 
 export function LiveFeedApp() {
@@ -18,24 +27,26 @@ export function LiveFeedApp() {
   const [sourceFilter, setSourceFilter] = useState<PromptSource | "all">("all");
   const [status, setStatus] = useState("Connecting");
   const [copied, setCopied] = useState(false);
-  const [siteOrigin, setSiteOrigin] = useState("https://trymonty.ai");
-
-  const installCommand = useMemo(() => {
-    return `npx monty-cli install`;
-  }, [siteOrigin]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setSiteOrigin(window.location.origin), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+  const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let closed = false;
+    let initialLoadDone = false;
     const seen = new Set<string>();
 
-    const addEvent = (event: PromptEvent) => {
+    const addEvent = (event: PromptEvent, isRealtime = false) => {
       if (seen.has(event.id)) return;
       seen.add(event.id);
+      if (isRealtime) {
+        setFreshIds((prev) => new Set(prev).add(event.id));
+        setTimeout(() => {
+          setFreshIds((prev) => {
+            const next = new Set(prev);
+            next.delete(event.id);
+            return next;
+          });
+        }, 5000);
+      }
       setEvents((current) =>
         [event, ...current.filter((item) => item.id !== event.id)]
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -47,17 +58,18 @@ export function LiveFeedApp() {
       .then((response) => response.json())
       .then((data: { events?: PromptEvent[] }) => {
         if (closed) return;
-        (data.events ?? []).reverse().forEach(addEvent);
-        setStatus(hasBrowserSupabaseConfig() ? "Realtime via Supabase" : "Realtime via local stream");
+        (data.events ?? []).reverse().forEach((e) => addEvent(e, false));
+        initialLoadDone = true;
+        setStatus("Live");
       })
       .catch(() => setStatus("Waiting for events"));
 
     const source = new EventSource(`/api/events/stream?team=${encodeURIComponent(TEAM_ID)}`);
     source.addEventListener("prompt", (message) => {
-      addEvent(JSON.parse((message as MessageEvent).data) as PromptEvent);
+      addEvent(JSON.parse((message as MessageEvent).data) as PromptEvent, initialLoadDone);
       setStatus("Live");
     });
-    source.onerror = () => setStatus(hasBrowserSupabaseConfig() ? "Supabase live" : "Reconnecting");
+    source.onerror = () => setStatus(hasBrowserSupabaseConfig() ? "Live" : "Reconnecting");
 
     const supabase = getBrowserSupabase();
     const channel = supabase
@@ -71,12 +83,12 @@ export function LiveFeedApp() {
           filter: `team_id=eq.${TEAM_ID}`,
         },
         (payload) => {
-          addEvent(payload.new as PromptEvent);
-          setStatus("Supabase live");
+          addEvent(payload.new as PromptEvent, initialLoadDone);
+          setStatus("Live");
         },
       )
       .subscribe((state) => {
-        if (state === "SUBSCRIBED") setStatus("Supabase live");
+        if (state === "SUBSCRIBED") setStatus("Live");
       });
 
     return () => {
@@ -90,114 +102,145 @@ export function LiveFeedApp() {
   const totalToday = events.filter((event) => new Date(event.created_at).toDateString() === new Date().toDateString()).length;
 
   const copyInstall = async () => {
-    await navigator.clipboard.writeText(installCommand);
+    await navigator.clipboard.writeText(INSTALL_CMD);
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f7f4] text-[#171717]">
-      <section className="border-b border-black/10 bg-white">
-        <div className="mx-auto flex min-h-[88px] max-w-[1320px] flex-col justify-center gap-4 px-5 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold tracking-[0.18em] text-[#d65f14]">MONTY</div>
-            <h1 className="mt-1 text-3xl font-semibold leading-tight sm:text-4xl">Live AI prompt feed</h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <StatusPill label={status} active />
-            <StatusPill label={`${totalToday} today`} />
-            <StatusPill label={`team ${TEAM_ID}`} />
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto grid max-w-[1320px] gap-5 px-5 py-5 sm:px-8 lg:grid-cols-[1fr_360px]">
-        <div className="min-w-0 border border-black/10 bg-white">
-          <div className="flex flex-col gap-3 border-b border-black/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold">Prompt stream</h2>
-              <p className="text-sm text-[#666]">Claude Code and Codex CLI prompts appear here as soon as hooks fire.</p>
+    <main className="min-h-screen bg-white text-[#111]">
+      <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-black/[0.06]">
+        <nav className="mx-auto flex h-[5.25rem] max-w-[1280px] items-center gap-4 px-6 lg:px-10">
+          <div className="flex flex-1 items-center gap-6">
+            <Link href="/" className="flex items-center"><MontyLogo /></Link>
+            <div className="hidden sm:flex items-center gap-4 text-sm">
+              <Link href="/feed" className="text-[#111] font-medium">Feed</Link>
+              <Link href="/leaderboard" className="text-[#999] hover:text-[#111] font-medium transition-colors">Leaderboard</Link>
             </div>
-            <div className="flex rounded-md border border-black/10 bg-[#f4f4f1] p-1">
-              {(["all", "claude", "codex"] as const).map((source) => (
-                <button
-                  key={source}
-                  onClick={() => setSourceFilter(source)}
-                  className={`h-8 rounded px-3 text-sm font-medium ${sourceFilter === source ? "bg-white text-black shadow-sm" : "text-[#666] hover:text-black"}`}
-                >
-                  {source === "all" ? "All" : sourceLabels[source]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="divide-y divide-black/10">
-            {filteredEvents.length === 0 ? (
-              <div className="grid min-h-[520px] place-items-center px-6 text-center">
-                <div>
-                  <div className="mx-auto mb-4 size-2 rounded-full bg-emerald-500" />
-                  <h3 className="text-lg font-semibold">Waiting for the first prompt</h3>
-                  <p className="mt-2 max-w-md text-sm leading-6 text-[#666]">
-                    Install Monty on this machine, then submit a prompt in Claude Code or Codex CLI. The feed updates without a refresh.
-                  </p>
-                </div>
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <div className={`w-2 h-2 rounded-full ${status === "Live" ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+                <span className={`text-xs font-medium ${status === "Live" ? "text-emerald-600" : "text-amber-600"}`}>{status}</span>
               </div>
-            ) : (
-              filteredEvents.map((event) => <PromptRow key={event.id} event={event} />)
-            )}
-          </div>
-        </div>
-
-        <aside className="flex flex-col gap-5">
-          <div className="border border-black/10 bg-white p-4">
-            <h2 className="text-base font-semibold">Install</h2>
-            <p className="mt-1 text-sm leading-6 text-[#666]">One command writes both prompt-submit hooks and stores this site URL locally.</p>
-            <div className="mt-4 overflow-hidden rounded-md border border-black/10 bg-[#111]">
-              <code className="block overflow-x-auto whitespace-nowrap px-3 py-3 font-mono text-xs text-white">{installCommand}</code>
+              <span className="text-[#ddd] mx-1">|</span>
+              <span className="text-xs text-[#999] font-medium">{totalToday} prompts today</span>
             </div>
-            <button onClick={copyInstall} className="mt-3 h-9 w-full rounded-md bg-[#171717] px-3 text-sm font-semibold text-white hover:bg-black">
-              {copied ? "Copied" : "Copy install command"}
+          </div>
+          <div className="flex flex-1 items-center justify-end gap-5">
+            <a href="https://github.com/ethandgoodhart/monty" className="hidden items-center gap-2 rounded-lg px-3 text-sm font-medium text-[#111] hover:bg-black/5 lg:inline-flex h-[35px]">
+              <GitHubIcon />
+            </a>
+            <button
+              onClick={copyInstall}
+              className="inline-flex shrink-0 items-center text-sm font-medium hover:opacity-85 transition-opacity h-[35px] bg-[#111] text-white rounded-[10px] px-3 cursor-pointer"
+            >
+              {copied ? "Copied!" : "Install"}
             </button>
           </div>
+        </nav>
+      </header>
 
-          <div className="border border-black/10 bg-white p-4">
-            <h2 className="text-base font-semibold">Realtime backend</h2>
-            <dl className="mt-3 space-y-3 text-sm">
-              <Metric label="Supabase" value={hasBrowserSupabaseConfig() ? "Configured" : "Not configured"} />
-              <Metric label="Local stream" value="Enabled" />
-              <Metric label="Events loaded" value={events.length.toString()} />
-            </dl>
+      <section className="mx-auto max-w-[1280px] px-6 lg:px-10 py-8">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
+          <div>
+            <h1
+              className="text-[#111]"
+              style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)", fontWeight: 600, letterSpacing: "-0.02em" }}
+            >
+              Prompt stream
+            </h1>
+            <p className="mt-1 text-[15px] text-[#666]">Live prompts from your team, as they happen.</p>
           </div>
+          <div className="flex items-center gap-1 rounded-xl bg-[#f5f5f5] p-1">
+            {(["all", "claude", "codex"] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setSourceFilter(s)}
+                className={`h-8 rounded-lg px-3.5 text-sm font-medium transition-all ${
+                  sourceFilter === s
+                    ? "bg-white text-[#111] shadow-sm"
+                    : "text-[#999] hover:text-[#666]"
+                }`}
+              >
+                {s === "all" ? "All" : sourceLabels[s]}
+              </button>
+            ))}
+          </div>
+        </div>
 
-          <div className="border border-black/10 bg-white p-4">
-            <h2 className="text-base font-semibold">Manual test</h2>
-            <p className="mt-1 text-sm leading-6 text-[#666]">Useful for verifying the feed before opening either AI CLI.</p>
-            <code className="mt-4 block whitespace-pre-wrap rounded-md bg-[#f4f4f1] p-3 font-mono text-xs text-[#333]">
-              node ./cli/monty.js capture --source test --prompt &quot;Monty realtime smoke test&quot;
-            </code>
+        {filteredEvents.length === 0 ? (
+          <div className="rounded-2xl border border-black/[0.06] bg-white flex flex-col items-center justify-center py-32 text-center">
+            <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse mb-6" />
+            <h3 className="text-xl font-semibold text-[#111]">Waiting for the first prompt</h3>
+            <p className="mt-3 max-w-md text-[15px] leading-relaxed text-[#666]">
+              Install Monty, then submit a prompt in Claude Code or Codex CLI. It'll appear here instantly.
+            </p>
+            <div className="mt-6 flex items-center gap-2 rounded-[10px] bg-[#f5f5f5] px-4 py-2.5">
+              <span className="opacity-50 select-none font-mono text-sm">$</span>
+              <span className="font-mono text-sm text-[#111]">{INSTALL_CMD}</span>
+              <button onClick={copyInstall} className="flex size-8 items-center justify-center rounded-full hover:bg-black/10">
+                {copied ? <CheckIcon /> : <CopyIcon />}
+              </button>
+            </div>
           </div>
-        </aside>
+        ) : (
+          <div className="space-y-3">
+            {filteredEvents.map((event, i) => (
+              <PromptCard key={event.id} event={event} isLatest={i === 0} isFresh={freshIds.has(event.id)} />
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );
 }
 
-function PromptRow({ event }: { event: PromptEvent }) {
+function PromptCard({ event, isLatest, isFresh }: { event: PromptEvent; isLatest: boolean; isFresh: boolean }) {
   return (
-    <article className="grid gap-3 px-4 py-4 hover:bg-[#fbfbf8] sm:grid-cols-[40px_128px_1fr]">
-      <Avatar event={event} />
-      <div className="flex items-start gap-3 sm:block">
-        <span className="inline-flex rounded bg-[#f0f0ec] px-2 py-1 text-xs font-semibold text-[#333]">{sourceLabels[event.source]}</span>
-        <time className="text-xs text-[#777] sm:mt-2 sm:block">{relativeTime(event.created_at)}</time>
-      </div>
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="font-semibold">{event.user_name}</span>
-          <span className="text-[#999]">on</span>
-          <span className="font-mono text-xs text-[#666]">{event.machine_id}</span>
-          {event.cwd ? <span className="truncate font-mono text-xs text-[#999]">{event.cwd}</span> : null}
+    <article
+      className={`rounded-2xl border bg-white px-6 py-5 transition-all duration-700 hover:shadow-md ${
+        isFresh
+          ? "border-emerald-300 shadow-lg shadow-emerald-100/50 ring-1 ring-emerald-200/40 animate-[slideIn_0.4s_ease-out]"
+          : isLatest
+            ? "border-emerald-200/60 shadow-sm"
+            : "border-black/[0.06]"
+      }`}
+      style={isFresh ? { borderLeftWidth: "3px", borderLeftColor: "#34d399" } : undefined}
+    >
+      <div className="flex items-start gap-4">
+        <Avatar event={event} />
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[15px] font-semibold text-[#111]">{event.user_name}</span>
+            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${sourceColors[event.source]}`}>
+              {sourceLabels[event.source]}
+            </span>
+            {isFresh && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 animate-pulse">
+                NEW
+              </span>
+            )}
+            <span className={`text-xs ml-auto shrink-0 ${isFresh ? "text-emerald-500 font-medium" : "text-[#bbb]"}`}>{relativeTime(event.created_at)}</span>
+          </div>
+          {event.cwd && (
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-[#999]">
+              <span className="font-mono truncate">{event.machine_id}</span>
+              <span className="text-[#ddd]">/</span>
+              <span className="font-mono truncate">{event.cwd}</span>
+            </div>
+          )}
+          <p className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-[#333]">{event.prompt}</p>
+          {(event.model || event.token_count) && (
+            <div className="mt-3 flex items-center gap-3">
+              {event.model && (
+                <span className="rounded-lg bg-[#f5f5f5] px-2 py-1 text-[11px] font-medium text-[#888]">{event.model}</span>
+              )}
+              {event.token_count && (
+                <span className="text-[11px] text-[#bbb]">{event.token_count.toLocaleString()} tokens</span>
+              )}
+            </div>
+          )}
         </div>
-        <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-6 text-[#222]">{event.prompt}</p>
       </div>
     </article>
   );
@@ -208,36 +251,18 @@ function Avatar({ event }: { event: PromptEvent }) {
   const avatarUrl = validAvatarUrl(event.avatar_url);
 
   return (
-    <div className="size-9 overflow-hidden rounded-full border border-black/10 bg-[#ecece7]">
+    <div className="size-10 overflow-hidden rounded-full bg-gradient-to-br from-[#eee] to-[#ddd] shrink-0">
       {avatarUrl ? (
         <Image
           src={avatarUrl}
-          alt={`${event.user_name} GitHub avatar`}
-          width={36}
-          height={36}
-          className="size-9 object-cover"
+          alt={event.user_name}
+          width={40}
+          height={40}
+          className="size-10 object-cover"
         />
       ) : (
-        <div className="grid size-9 place-items-center text-xs font-semibold text-[#555]">{initials}</div>
+        <div className="grid size-10 place-items-center text-xs font-semibold text-[#888]">{initials}</div>
       )}
-    </div>
-  );
-}
-
-function StatusPill({ label, active = false }: { label: string; active?: boolean }) {
-  return (
-    <span className="inline-flex h-8 items-center gap-2 rounded-md border border-black/10 bg-[#f7f7f4] px-3 text-sm font-medium text-[#444]">
-      {active ? <span className="size-2 rounded-full bg-emerald-500" /> : null}
-      {label}
-    </span>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <dt className="text-[#666]">{label}</dt>
-      <dd className="font-medium">{value}</dd>
     </div>
   );
 }
@@ -259,11 +284,9 @@ function initialsFor(name: string) {
 
 function validAvatarUrl(value: string | null) {
   if (!value || value === "undefined" || value === "null") return null;
-
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    return url.toString();
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
   } catch {
     return null;
   }

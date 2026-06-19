@@ -12,6 +12,8 @@ export type PromptEvent = {
   cwd: string | null;
   model: string | null;
   token_count: number | null;
+  input_tokens: number;
+  output_tokens: number;
   session_id: string | null;
   metadata: Record<string, unknown>;
 };
@@ -39,6 +41,8 @@ export function normalizePromptEvent(input: Partial<PromptEventInput>): PromptEv
     cwd: nullableString(input.cwd),
     model: nullableString(input.model),
     token_count: typeof input.token_count === "number" && Number.isFinite(input.token_count) ? input.token_count : null,
+    input_tokens: finiteNumberOr(input.input_tokens, metadataNum(input.metadata, "input_tokens")),
+    output_tokens: finiteNumberOr(input.output_tokens, metadataNum(input.metadata, "output_tokens")),
     session_id: nullableString(input.session_id),
     metadata: isRecord(input.metadata) ? input.metadata : {},
   };
@@ -62,6 +66,16 @@ function nullableUrl(value: unknown) {
   } catch {
     return null;
   }
+}
+
+function finiteNumberOr(primary: unknown, fallback: number): number {
+  if (typeof primary === "number" && Number.isFinite(primary)) return primary;
+  return fallback;
+}
+
+function metadataNum(metadata: unknown, key: string): number {
+  if (isRecord(metadata) && typeof metadata[key] === "number" && Number.isFinite(metadata[key] as number)) return metadata[key] as number;
+  return 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

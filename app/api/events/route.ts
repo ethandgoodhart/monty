@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const teamId = request.nextUrl.searchParams.get("team") || "default";
+  const limit = Math.min(Number(request.nextUrl.searchParams.get("limit")) || 100, 2000);
   const supabase = getServerSupabase();
 
   if (supabase) {
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
       .select("*")
       .eq("team_id", teamId)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(limit);
 
     if (!error && data) {
       return NextResponse.json({ events: data.map((event) => normalizePromptEvent(event)) });

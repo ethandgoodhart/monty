@@ -21,6 +21,7 @@ async function main() {
     if (command === "capture") return captureCommand(args);
     if (command === "hook") return hookCommandHandler(args);
     if (command === "run") return runWrapped(args);
+    if (command === "sync") return syncHistory(args);
     if (command === "doctor") return doctor();
     if (command === "help" || command === "--help" || command === "-h") return help();
 
@@ -95,6 +96,9 @@ async function sendPrompt(source, input) {
     return;
   }
 
+  const inputTokens = numberOrNull(input.input_tokens || input.inputTokens) || 0;
+  const outputTokens = numberOrNull(input.output_tokens || input.outputTokens) || 0;
+
   const event = {
     team_id: config.teamId || process.env.MONTY_TEAM_ID || "default",
     source: normalizeSource(source),
@@ -105,11 +109,15 @@ async function sendPrompt(source, input) {
     cwd: input.cwd || process.cwd(),
     model: input.model || input.model_id || null,
     token_count: numberOrNull(input.token_count || input.tokens || input.total_tokens),
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
     session_id: input.session_id || input.conversation_id || null,
     metadata: {
       hook_event_name: input.hook_event_name || input.hookEventName || null,
       transcript_path: input.transcript_path || null,
       cli: source,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
     },
   };
 
@@ -154,6 +162,331 @@ function runWrapped(args) {
   process.exit(result.status ?? 1);
 }
 
+async function syncHistory(args) {
+  const options = parseArgs(args);
+  const config = readConfig();
+  const siteUrl = cleanUrl(config.siteUrl || options.site || process.env.MONTY_SITE_URL || "https://www.trymonty.ai");
+  const teamId = config.teamId || options.team || process.env.MONTY_TEAM_ID || "default";
+  const userName = config.userName || options.user || process.env.MONTY_USER || process.env.USER || "unknown";
+  const avatarUrl = config.avatarUrl || options.avatar || null;
+
+  console.log(`Syncing history for ${userName} (team: ${teamId}) to ${siteUrl}`);
+
+  const allEvents = [];
+
+  const claudeEvents = parseClaudeHistory(userName, avatarUrl, teamId);
+  console.log(`Found ${claudeEvents.length} Claude Code turns`);
+  allEvents.push(...claudeEvents);
+
+  const codexEvents = parseCodexHistory(userName, avatarUrl, teamId);
+  console.log(`Found ${codexEvents.length} Codex turns`);
+  allEvents.push(...codexEvents);
+
+  if (allEvents.length === 0) {
+    console.log("No history found to sync.");
+    return;
+  }
+
+  allEvents.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  console.log(`Total events to sync: ${allEvents.length}`);
+
+  const headers = { "content-type": "application/json" };
+  const token = config.ingestToken || process.env.MONTY_INGEST_TOKEN;
+  if (token) headers.authorization = `Bearer ${token}`;
+
+  const batchSize = 200;
+  let synced = 0;
+  for (let i = 0; i < allEvents.length; i += batchSize) {
+    const batch = allEvents.slice(i, i + batchSize);
+    try {
+      const response = await fetch(`${siteUrl}/api/sync`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ events: batch }),
+      });
+      const result = await response.json();
+      synced += result.inserted || 0;
+      process.stdout.write(`\r  Synced ${Math.min(i + batchSize, allEvents.length)}/${allEvents.length}...`);
+    } catch (error) {
+      console.error(`\nBatch failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  console.log(`\nDone. ${synced} events synced.`);
+}
+
+function parseClaudeHistory(userName, avatarUrl, teamId) {
+  const claudeDir = path.join(home, ".claude", "projects");
+  if (!fs.existsSync(claudeDir)) return [];
+
+  const events = [];
+  const projectDirs = fs.readdirSync(claudeDir).filter((d) => {
+    try { return fs.statSync(path.join(claudeDir, d)).isDirectory(); } catch { return false; }
+  });
+
+  for (const projectDir of projectDirs) {
+    const fullDir = path.join(claudeDir, projectDir);
+    const jsonlFiles = fs.readdirSync(fullDir).filter((f) => f.endsWith(".jsonl"));
+
+    for (const file of jsonlFiles) {
+      const sessionId = file.replace(".jsonl", "");
+      const filePath = path.join(fullDir, file);
+      try {
+        const sessionEvents = parseClaudeSession(filePath, sessionId, userName, avatarUrl, teamId, projectDir);
+        events.push(...sessionEvents);
+      } catch {
+        // skip corrupt files
+      }
+    }
+  }
+
+  return events;
+}
+
+function parseClaudeSession(filePath, sessionId, userName, avatarUrl, teamId, projectDir) {
+  const content = fs.readFileSync(filePath, "utf8");
+  const lines = content.split("\n").filter(Boolean);
+  const events = [];
+
+  let currentUserPrompt = null;
+  let currentCwd = null;
+  let turnIndex = 0;
+
+  for (const line of lines) {
+    let entry;
+    try { entry = JSON.parse(line); } catch { continue; }
+
+    if (entry.type === "user" && entry.message) {
+      const prompt = extractPromptFromClaudeMessage(entry.message);
+      if (prompt && !prompt.startsWith("<task-notification>") && !prompt.startsWith("<system-reminder>") && !prompt.startsWith("<command-name>")) {
+        if (currentUserPrompt) {
+          if (currentUserPrompt.inputTokens > 0 || currentUserPrompt.outputTokens > 0) {
+            events.push(buildClaudeTurnEvent(currentUserPrompt, sessionId, userName, avatarUrl, teamId, projectDir, turnIndex++));
+          }
+        }
+        currentUserPrompt = {
+          prompt,
+          timestamp: entry.timestamp,
+          cwd: entry.cwd || currentCwd,
+          model: null,
+          inputTokens: 0,
+          outputTokens: 0,
+        };
+        if (entry.cwd) currentCwd = entry.cwd;
+      }
+    }
+
+    if (entry.type === "assistant" && entry.message) {
+      const msg = entry.message;
+      const usage = msg.usage || {};
+      const model = msg.model || null;
+      if (model === "<synthetic>") continue;
+      const inputTokens = (usage.input_tokens || 0) + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0);
+      const outputTokens = usage.output_tokens || 0;
+
+      if (currentUserPrompt) {
+        currentUserPrompt.inputTokens += inputTokens;
+        currentUserPrompt.outputTokens += outputTokens;
+        if (model) currentUserPrompt.model = model;
+      }
+    }
+  }
+
+  if (currentUserPrompt && (currentUserPrompt.inputTokens > 0 || currentUserPrompt.outputTokens > 0)) {
+    events.push(buildClaudeTurnEvent(currentUserPrompt, sessionId, userName, avatarUrl, teamId, projectDir, turnIndex));
+  }
+
+  return events;
+}
+
+function buildClaudeTurnEvent(turn, sessionId, userName, avatarUrl, teamId, projectDir, turnIndex) {
+  const cwd = turn.cwd || projectDirToCwd(projectDir);
+  const createdAt = turn.timestamp ? new Date(turn.timestamp).toISOString() : new Date().toISOString();
+
+  return {
+    id: deterministicUUID(`claude-turn-${sessionId}-${turnIndex}`),
+    created_at: createdAt,
+    team_id: teamId,
+    source: "claude",
+    prompt: turn.prompt || "",
+    user_name: userName,
+    avatar_url: avatarUrl,
+    machine_id: os.hostname(),
+    cwd,
+    model: turn.model,
+    token_count: turn.inputTokens + turn.outputTokens,
+    input_tokens: turn.inputTokens,
+    output_tokens: turn.outputTokens,
+    session_id: sessionId,
+    metadata: {
+      cli: "claude",
+      hook_event_name: "HistorySync",
+      input_tokens: turn.inputTokens,
+      output_tokens: turn.outputTokens,
+    },
+  };
+}
+
+function extractPromptFromClaudeMessage(message) {
+  if (typeof message === "string") return message;
+  if (message && typeof message.content === "string") return message.content;
+  if (message && Array.isArray(message.content)) {
+    for (const block of message.content) {
+      if (block && block.type === "text" && typeof block.text === "string") return block.text;
+    }
+  }
+  return "";
+}
+
+function projectDirToCwd(projectDir) {
+  return projectDir.replace(/^-/, "/").replace(/-/g, "/");
+}
+
+function parseCodexHistory(userName, avatarUrl, teamId) {
+  const dbPath = path.join(home, ".codex", "state_5.sqlite");
+  if (!fs.existsSync(dbPath)) return [];
+
+  try {
+    const result = spawnSync("sqlite3", ["-json", dbPath,
+      "SELECT id, title, model, tokens_used, model_provider, created_at, cwd, SUBSTR(first_user_message, 1, 500) AS first_user_message, cli_version FROM threads WHERE tokens_used > 0 ORDER BY created_at DESC",
+    ], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 100 * 1024 * 1024 });
+
+    if (result.status !== 0 || !result.stdout.trim()) return [];
+
+    const threads = JSON.parse(result.stdout);
+    const allEvents = [];
+
+    for (const thread of threads) {
+      const rolloutTurns = parseCodexRolloutTurns(thread.id);
+
+      if (rolloutTurns.length > 0) {
+        for (let i = 0; i < rolloutTurns.length; i++) {
+          const turn = rolloutTurns[i];
+          const createdAt = turn.timestamp || (thread.created_at ? new Date(thread.created_at * 1000).toISOString() : new Date().toISOString());
+          allEvents.push({
+            id: deterministicUUID(`codex-turn-${thread.id}-${i}`),
+            created_at: createdAt,
+            team_id: teamId,
+            source: "codex",
+            prompt: turn.prompt || "",
+            user_name: userName,
+            avatar_url: avatarUrl,
+            machine_id: os.hostname(),
+            cwd: thread.cwd || null,
+            model: thread.model || null,
+            token_count: turn.inputTokens + turn.outputTokens,
+            input_tokens: turn.inputTokens,
+            output_tokens: turn.outputTokens,
+            session_id: thread.id,
+            metadata: {
+              cli: "codex",
+              hook_event_name: "HistorySync",
+              input_tokens: turn.inputTokens,
+              output_tokens: turn.outputTokens,
+            },
+          });
+        }
+      } else {
+        const createdAt = thread.created_at ? new Date(thread.created_at * 1000).toISOString() : new Date().toISOString();
+        const tokensUsed = thread.tokens_used || 0;
+        allEvents.push({
+          id: deterministicUUID(`codex-turn-${thread.id}-0`),
+          created_at: createdAt,
+          team_id: teamId,
+          source: "codex",
+          prompt: thread.first_user_message || thread.title || "(session)",
+          user_name: userName,
+          avatar_url: avatarUrl,
+          machine_id: os.hostname(),
+          cwd: thread.cwd || null,
+          model: thread.model || null,
+          token_count: tokensUsed,
+          input_tokens: Math.round(tokensUsed * 0.7),
+          output_tokens: Math.round(tokensUsed * 0.3),
+          session_id: thread.id,
+          metadata: {
+            cli: "codex",
+            hook_event_name: "HistorySync",
+            input_tokens: Math.round(tokensUsed * 0.7),
+            output_tokens: Math.round(tokensUsed * 0.3),
+          },
+        });
+      }
+    }
+
+    return allEvents;
+  } catch {
+    return [];
+  }
+}
+
+function parseCodexRolloutTurns(threadId) {
+  const sessionsDir = path.join(home, ".codex", "sessions");
+  if (!fs.existsSync(sessionsDir)) return [];
+
+  try {
+    const result = spawnSync("find", [sessionsDir, "-name", `*${threadId}*`, "-type", "f"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+
+    if (result.status !== 0 || !result.stdout.trim()) return [];
+
+    const rolloutFile = result.stdout.trim().split("\n")[0];
+    if (!rolloutFile || !fs.existsSync(rolloutFile)) return [];
+
+    const content = fs.readFileSync(rolloutFile, "utf8");
+    const turns = [];
+    let currentPrompt = null;
+    let lastTotalInput = 0;
+    let lastTotalOutput = 0;
+
+    for (const line of content.split("\n")) {
+      if (!line) continue;
+      let entry;
+      try { entry = JSON.parse(line); } catch { continue; }
+
+      if (entry.type === "response_item" && entry.payload?.role === "user") {
+        const textBlock = (entry.payload.content || []).find((c) => c.type === "input_text" && c.text);
+        if (textBlock && !textBlock.text.startsWith("<")) {
+          if (currentPrompt && currentPrompt.hasTokens) {
+            turns.push(currentPrompt);
+          }
+          currentPrompt = {
+            prompt: textBlock.text.slice(0, 500),
+            timestamp: entry.timestamp,
+            inputTokens: 0,
+            outputTokens: 0,
+            hasTokens: false,
+          };
+        }
+      }
+
+      if (entry.type === "event_msg" && entry.payload?.type === "token_count" && entry.payload.info) {
+        const total = entry.payload.info.total_token_usage;
+        if (total && currentPrompt) {
+          const turnInput = (total.input_tokens || 0) - lastTotalInput;
+          const turnOutput = (total.output_tokens || 0) - lastTotalOutput;
+          if (turnInput > 0 || turnOutput > 0) {
+            currentPrompt.inputTokens = turnInput;
+            currentPrompt.outputTokens = turnOutput;
+            currentPrompt.hasTokens = true;
+            lastTotalInput = total.input_tokens || 0;
+            lastTotalOutput = total.output_tokens || 0;
+          }
+        }
+      }
+    }
+
+    if (currentPrompt && currentPrompt.hasTokens) {
+      turns.push(currentPrompt);
+    }
+
+    return turns;
+  } catch {
+    return [];
+  }
+}
+
 function doctor() {
   const config = readConfig();
   const checks = [
@@ -174,10 +507,9 @@ function upsertHookJson(filePath, source) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const data = readJson(filePath, {});
   data.hooks ||= {};
-  data.hooks.UserPromptSubmit ||= [];
 
   const command = `"${process.execPath}" "${installedCliPath}" hook --source ${source}`;
-  const group = {
+  const promptGroup = {
     hooks: [
       {
         type: "command",
@@ -188,11 +520,34 @@ function upsertHookJson(filePath, source) {
     ],
   };
 
-  data.hooks.UserPromptSubmit = data.hooks.UserPromptSubmit.filter((entry) => {
+  const stopMarker = "Monty token sync";
+  const stopCommand = `"${process.execPath}" "${installedCliPath}" hook --source ${source}`;
+  const stopGroup = {
+    hooks: [
+      {
+        type: "command",
+        command: stopCommand,
+        timeout: 10,
+        statusMessage: stopMarker,
+      },
+    ],
+  };
+
+  const filterMonty = (entry) => {
     const serialized = JSON.stringify(entry);
-    return !serialized.includes(installedCliPath) && !serialized.includes(installedCliDisplayPath) && !serialized.includes(marker);
-  });
-  data.hooks.UserPromptSubmit.push(group);
+    return !serialized.includes(installedCliPath) && !serialized.includes(installedCliDisplayPath) && !serialized.includes(marker) && !serialized.includes(stopMarker);
+  };
+
+  data.hooks.UserPromptSubmit ||= [];
+  data.hooks.UserPromptSubmit = data.hooks.UserPromptSubmit.filter(filterMonty);
+  data.hooks.UserPromptSubmit.push(promptGroup);
+
+  if (source === "claude") {
+    data.hooks.Stop ||= [];
+    data.hooks.Stop = data.hooks.Stop.filter(filterMonty);
+    data.hooks.Stop.push(stopGroup);
+  }
+
   writeJson(filePath, data);
 }
 
@@ -372,6 +727,18 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function deterministicUUID(input) {
+  const crypto = require("node:crypto");
+  const hash = crypto.createHash("sha256").update(input).digest("hex");
+  return [
+    hash.slice(0, 8),
+    hash.slice(8, 12),
+    "4" + hash.slice(13, 16),
+    ((parseInt(hash.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, "0") + hash.slice(18, 20),
+    hash.slice(20, 32),
+  ].join("-");
+}
+
 function normalizeSource(value) {
   return value === "claude" || value === "codex" || value === "test" ? value : "manual";
 }
@@ -399,6 +766,7 @@ function help() {
 
 Usage:
   monty install --site http://localhost:3000 --team default
+  monty sync                      Sync all Claude Code & Codex history with real token counts
   monty capture --source test --prompt "hello"
   monty run codex exec "prompt"
   monty run claude -p "prompt"

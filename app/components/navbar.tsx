@@ -18,8 +18,12 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-black/[0.06]">
       <nav className="mx-auto flex h-[5.25rem] max-w-[1280px] items-center gap-4 px-6 lg:px-10">
-        <div className="flex flex-1 items-center gap-12">
+        <div className="flex flex-1 items-center gap-6">
           <Link href="/" className="flex items-center"><MontyLogo /></Link>
+          <div className="hidden sm:flex items-center gap-4 text-sm">
+            <Link href="/feed" className="text-[#999] hover:text-[#111] font-medium transition-colors">Feed</Link>
+            <Link href="/leaderboard" className="text-[#999] hover:text-[#111] font-medium transition-colors">Leaderboard</Link>
+          </div>
         </div>
         <div className="flex flex-1 items-center justify-end gap-5">
           <a href="#" className="hidden items-center gap-2 rounded-lg px-3 text-sm font-medium text-[#111] hover:bg-black/5 lg:inline-flex h-[35px]">
