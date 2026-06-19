@@ -92,3 +92,23 @@ body {
   0% { opacity: 0; transform: translateY(-8px) scale(0.98); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+@keyframes feedSlideIn {
+  0% { opacity: 0; transform: translateY(-6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes velocity-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.velocity-shimmer {
+  background-image: linear-gradient(90deg, #f97316, #f43f5e, #fb923c, #f43f5e, #f97316);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+  animation: velocity-shimmer 3s ease-in-out infinite;
+}

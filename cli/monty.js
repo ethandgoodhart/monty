@@ -84,7 +84,96 @@ async function hookCommandHandler(args) {
   const options = parseArgs(args);
   const source = options.source || "manual";
   const input = await readStdinJson();
-  await sendPrompt(source, input);
+
+  if (input.hook_event_name === "Stop" && input.session_id && input.transcript_path) {
+    await Promise.all([
+      handleStopHook(source, input),
+      sendHeartbeat(),
+    ]);
+    return;
+  }
+
+  if (input.hook_event_name === "UserPromptSubmit" && input.session_id && input.transcript_path) {
+    handleStopHook(source, input).catch(() => {});
+  }
+
+  await Promise.all([
+    sendPrompt(source, input),
+    sendHeartbeat(),
+  ]);
+}
+
+async function handleStopHook(source, input) {
+  const config = readConfig();
+  const sessionId = input.session_id;
+  const transcriptPath = input.transcript_path;
+
+  if (!transcriptPath || !fs.existsSync(transcriptPath)) return;
+
+  try {
+    const content = fs.readFileSync(transcriptPath, "utf8");
+    const lines = content.split("\n").filter(Boolean);
+
+    let lastUserPrompt = null;
+    let totalInput = 0;
+    let totalOutput = 0;
+    let cacheCreation = 0;
+    let cacheRead = 0;
+    let model = null;
+    let turnStarted = false;
+
+    for (let i = lines.length - 1; i >= 0; i--) {
+      let entry;
+      try { entry = JSON.parse(lines[i]); } catch { continue; }
+
+      if (entry.type === "assistant" && entry.message) {
+        const usage = entry.message.usage || {};
+        totalInput += usage.input_tokens || 0;
+        totalOutput += usage.output_tokens || 0;
+        cacheCreation += usage.cache_creation_input_tokens || 0;
+        cacheRead += usage.cache_read_input_tokens || 0;
+        if (entry.message.model && entry.message.model !== "<synthetic>") model = entry.message.model;
+        turnStarted = true;
+      }
+
+      if (entry.type === "user" && entry.message && turnStarted) {
+        lastUserPrompt = extractPromptFromClaudeMessage(entry.message);
+        break;
+      }
+    }
+
+    if (!lastUserPrompt || (totalInput === 0 && totalOutput === 0)) return;
+
+    const siteUrl = cleanUrl(config.siteUrl || process.env.MONTY_SITE_URL || "https://www.trymonty.ai");
+    const headers = { "content-type": "application/json" };
+    const token = config.ingestToken || process.env.MONTY_INGEST_TOKEN;
+    if (token) headers.authorization = `Bearer ${token}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      await fetch(`${siteUrl}/api/events`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          session_id: sessionId,
+          prompt: lastUserPrompt,
+          model,
+          input_tokens: totalInput,
+          output_tokens: totalOutput,
+          cache_creation_input_tokens: cacheCreation,
+          cache_read_input_tokens: cacheRead,
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      silentLog(`Monty stop-hook failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (error) {
+    silentLog(`Monty stop-hook transcript parse failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 async function sendPrompt(source, input) {
@@ -92,12 +181,13 @@ async function sendPrompt(source, input) {
   const prompt = extractPrompt(input);
 
   if (!prompt) {
-    silentLog("No prompt found in hook payload.");
     return;
   }
 
   const inputTokens = numberOrNull(input.input_tokens || input.inputTokens) || 0;
   const outputTokens = numberOrNull(input.output_tokens || input.outputTokens) || 0;
+  const cacheCreationTokens = numberOrNull(input.cache_creation_input_tokens) || 0;
+  const cacheReadTokens = numberOrNull(input.cache_read_input_tokens) || 0;
 
   const event = {
     team_id: config.teamId || process.env.MONTY_TEAM_ID || "default",
@@ -107,7 +197,7 @@ async function sendPrompt(source, input) {
     avatar_url: config.avatarUrl || process.env.MONTY_AVATAR_URL || null,
     machine_id: config.machineId || os.hostname(),
     cwd: input.cwd || process.cwd(),
-    model: input.model || input.model_id || null,
+    model: input.model || input.model_id || detectClaudeModel(source) || null,
     token_count: numberOrNull(input.token_count || input.tokens || input.total_tokens),
     input_tokens: inputTokens,
     output_tokens: outputTokens,
@@ -118,6 +208,8 @@ async function sendPrompt(source, input) {
       cli: source,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
+      cache_creation_input_tokens: cacheCreationTokens,
+      cache_read_input_tokens: cacheReadTokens,
     },
   };
 
@@ -127,7 +219,7 @@ async function sendPrompt(source, input) {
   if (token) headers.authorization = `Bearer ${token}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2500);
+  const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const response = await fetch(`${siteUrl}/api/events`, {
       method: "POST",
@@ -140,6 +232,33 @@ async function sendPrompt(source, input) {
     }
   } catch (error) {
     silentLog(`Monty ingest failed: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function sendHeartbeat() {
+  const config = readConfig();
+  const siteUrl = cleanUrl(config.siteUrl || process.env.MONTY_SITE_URL || "https://www.trymonty.ai");
+  const headers = { "content-type": "application/json" };
+  const token = config.ingestToken || process.env.MONTY_INGEST_TOKEN;
+  if (token) headers.authorization = `Bearer ${token}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    await fetch(`${siteUrl}/api/heartbeat`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        team_id: config.teamId || process.env.MONTY_TEAM_ID || "default",
+        user_name: config.userName || process.env.MONTY_USER || process.env.USER || "unknown",
+        seconds: 30,
+      }),
+      signal: controller.signal,
+    });
+  } catch {
+    // Heartbeat failures are non-critical
   } finally {
     clearTimeout(timeout);
   }
@@ -270,6 +389,9 @@ function parseClaudeSession(filePath, sessionId, userName, avatarUrl, teamId, pr
           model: null,
           inputTokens: 0,
           outputTokens: 0,
+          cacheCreationTokens: 0,
+          cacheReadTokens: 0,
+          seenMsgIds: new Set(),
         };
         if (entry.cwd) currentCwd = entry.cwd;
       }
@@ -277,15 +399,21 @@ function parseClaudeSession(filePath, sessionId, userName, avatarUrl, teamId, pr
 
     if (entry.type === "assistant" && entry.message) {
       const msg = entry.message;
+      const msgId = msg.id;
       const usage = msg.usage || {};
       const model = msg.model || null;
       if (model === "<synthetic>") continue;
-      const inputTokens = (usage.input_tokens || 0) + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0);
-      const outputTokens = usage.output_tokens || 0;
 
-      if (currentUserPrompt) {
-        currentUserPrompt.inputTokens += inputTokens;
+      if (currentUserPrompt && msgId && !currentUserPrompt.seenMsgIds.has(msgId)) {
+        currentUserPrompt.seenMsgIds.add(msgId);
+        const rawInput = usage.input_tokens || 0;
+        const cacheCreation = usage.cache_creation_input_tokens || 0;
+        const cacheRead = usage.cache_read_input_tokens || 0;
+        const outputTokens = usage.output_tokens || 0;
+        currentUserPrompt.inputTokens += rawInput + cacheCreation + cacheRead;
         currentUserPrompt.outputTokens += outputTokens;
+        currentUserPrompt.cacheCreationTokens += cacheCreation;
+        currentUserPrompt.cacheReadTokens += cacheRead;
         if (model) currentUserPrompt.model = model;
       }
     }
@@ -322,6 +450,8 @@ function buildClaudeTurnEvent(turn, sessionId, userName, avatarUrl, teamId, proj
       hook_event_name: "HistorySync",
       input_tokens: turn.inputTokens,
       output_tokens: turn.outputTokens,
+      cache_creation_input_tokens: turn.cacheCreationTokens || 0,
+      cache_read_input_tokens: turn.cacheReadTokens || 0,
     },
   };
 }
@@ -582,6 +712,17 @@ function otelEndpoint(config) {
   if (config.avatarUrl) params.set("avatar", config.avatarUrl);
   if (config.githubLogin) params.set("github", config.githubLogin);
   return `${cleanUrl(config.siteUrl)}/api/otel/v1/logs?${params.toString()}`;
+}
+
+function detectClaudeModel(source) {
+  if (source !== "claude") return null;
+  try {
+    const settingsPath = path.join(home, ".claude", "settings.json");
+    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    return settings.model || null;
+  } catch {
+    return null;
+  }
 }
 
 function detectGitHubProfile(options = {}) {

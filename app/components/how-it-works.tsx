@@ -16,7 +16,7 @@ const steps = [
     number: "03",
     title: "Open the dashboard",
     description:
-      "Your team's live feed and leaderboard are ready instantly. See who's building what, track token spend, and discover how AI is accelerating your engineering org.",
+      "Your team's live feed and token tracking are ready instantly. See who's building what, track token spend, and discover how AI is accelerating your engineering org.",
   },
 ];
 

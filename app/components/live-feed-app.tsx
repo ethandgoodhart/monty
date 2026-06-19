@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MontyLogo, GitHubIcon, CopyIcon, CheckIcon } from "./icons";
-import { getBrowserSupabase, hasBrowserSupabaseConfig } from "@/app/lib/supabase";
+import { getBrowserSupabase } from "@/app/lib/supabase";
 import { PROMPT_EVENTS_TABLE, type PromptEvent, type PromptSource } from "@/app/lib/prompt-events";
+import { computeEventCost, formatCost, formatTokens } from "@/app/lib/pricing";
 
 const TEAM_ID = process.env.NEXT_PUBLIC_MONTY_TEAM_ID || "default";
 const INSTALL_CMD = "npx monty-cli install";
@@ -15,12 +16,6 @@ const sourceLabels: Record<PromptSource, string> = {
   manual: "Manual",
   test: "Test",
 };
-const sourceColors: Record<PromptSource, string> = {
-  claude: "bg-orange-50 text-orange-600 border-orange-200/60",
-  codex: "bg-violet-50 text-violet-600 border-violet-200/60",
-  manual: "bg-gray-50 text-gray-600 border-gray-200/60",
-  test: "bg-emerald-50 text-emerald-600 border-emerald-200/60",
-};
 
 export function LiveFeedApp() {
   const [events, setEvents] = useState<PromptEvent[]>([]);
@@ -28,6 +23,7 @@ export function LiveFeedApp() {
   const [status, setStatus] = useState("Connecting");
   const [copied, setCopied] = useState(false);
   const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
+  const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let closed = false;
@@ -39,19 +35,35 @@ export function LiveFeedApp() {
       seen.add(event.id);
       if (isRealtime) {
         setFreshIds((prev) => new Set(prev).add(event.id));
+        const hasTokens = (event.input_tokens || 0) + (event.output_tokens || 0) > 0;
+        if (!hasTokens) {
+          setRunningIds((prev) => new Set(prev).add(event.id));
+        }
         setTimeout(() => {
           setFreshIds((prev) => {
             const next = new Set(prev);
             next.delete(event.id);
             return next;
           });
-        }, 5000);
+        }, 4000);
       }
       setEvents((current) =>
         [event, ...current.filter((item) => item.id !== event.id)]
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
           .slice(0, 100),
       );
+    };
+
+    const updateEvent = (updated: PromptEvent) => {
+      setEvents((current) =>
+        current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+      );
+      setRunningIds((prev) => {
+        if (!prev.has(updated.id)) return prev;
+        const next = new Set(prev);
+        next.delete(updated.id);
+        return next;
+      });
     };
 
     fetch(`/api/events?team=${encodeURIComponent(TEAM_ID)}`, { cache: "no-store" })
@@ -64,26 +76,33 @@ export function LiveFeedApp() {
       })
       .catch(() => setStatus("Waiting for events"));
 
-    const source = new EventSource(`/api/events/stream?team=${encodeURIComponent(TEAM_ID)}`);
-    source.addEventListener("prompt", (message) => {
-      addEvent(JSON.parse((message as MessageEvent).data) as PromptEvent, initialLoadDone);
-      setStatus("Live");
-    });
-    source.onerror = () => setStatus(hasBrowserSupabaseConfig() ? "Live" : "Reconnecting");
-
     const supabase = getBrowserSupabase();
+
+    let source: EventSource | null = null;
+    if (!supabase) {
+      source = new EventSource(`/api/events/stream?team=${encodeURIComponent(TEAM_ID)}`);
+      source.addEventListener("prompt", (message) => {
+        addEvent(JSON.parse((message as MessageEvent).data) as PromptEvent, initialLoadDone);
+        setStatus("Live");
+      });
+      source.onerror = () => setStatus("Reconnecting");
+    }
     const channel = supabase
       ?.channel(`monty:${TEAM_ID}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: PROMPT_EVENTS_TABLE,
           filter: `team_id=eq.${TEAM_ID}`,
         },
         (payload) => {
-          addEvent(payload.new as PromptEvent, initialLoadDone);
+          if (payload.eventType === "UPDATE") {
+            updateEvent(payload.new as PromptEvent);
+          } else {
+            addEvent(payload.new as PromptEvent, initialLoadDone);
+          }
           setStatus("Live");
         },
       )
@@ -93,13 +112,12 @@ export function LiveFeedApp() {
 
     return () => {
       closed = true;
-      source.close();
+      source?.close();
       if (channel) supabase?.removeChannel(channel);
     };
   }, []);
 
   const filteredEvents = sourceFilter === "all" ? events : events.filter((event) => event.source === sourceFilter);
-  const totalToday = events.filter((event) => new Date(event.created_at).toDateString() === new Date().toDateString()).length;
 
   const copyInstall = async () => {
     await navigator.clipboard.writeText(INSTALL_CMD);
@@ -114,16 +132,8 @@ export function LiveFeedApp() {
           <div className="flex flex-1 items-center gap-6">
             <Link href="/" className="flex items-center"><MontyLogo /></Link>
             <div className="hidden sm:flex items-center gap-4 text-sm">
-              <Link href="/feed" className="text-[#111] font-medium">Feed</Link>
-              <Link href="/leaderboard" className="text-[#999] hover:text-[#111] font-medium transition-colors">Leaderboard</Link>
-            </div>
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <div className={`w-2 h-2 rounded-full ${status === "Live" ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
-                <span className={`text-xs font-medium ${status === "Live" ? "text-emerald-600" : "text-amber-600"}`}>{status}</span>
-              </div>
-              <span className="text-[#ddd] mx-1">|</span>
-              <span className="text-xs text-[#999] font-medium">{totalToday} prompts today</span>
+              <Link href="/feed" className="text-[#111] font-medium">Live</Link>
+              <Link href="/leaderboard" className="text-[#999] hover:text-[#111] font-medium transition-colors">Tokens</Link>
             </div>
           </div>
           <div className="flex flex-1 items-center justify-end gap-5">
@@ -140,16 +150,11 @@ export function LiveFeedApp() {
         </nav>
       </header>
 
-      <section className="mx-auto max-w-[1280px] px-6 lg:px-10 py-8">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
-          <div>
-            <h1
-              className="text-[#111]"
-              style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)", fontWeight: 600, letterSpacing: "-0.02em" }}
-            >
-              Prompt stream
-            </h1>
-            <p className="mt-1 text-[15px] text-[#666]">Live prompts from your team, as they happen.</p>
+      <section className="mx-auto max-w-[1280px] px-6 lg:px-10 pt-6 pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${status === "Live" ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+            <span className={`text-xs font-medium ${status === "Live" ? "text-emerald-600" : "text-amber-600"}`}>{status}</span>
           </div>
           <div className="flex items-center gap-1 rounded-xl bg-[#f5f5f5] p-1">
             {(["all", "claude", "codex"] as const).map((s) => (
@@ -167,9 +172,13 @@ export function LiveFeedApp() {
             ))}
           </div>
         </div>
+      </section>
 
+      {events.length > 0 && <PresenceBar events={events} />}
+
+      <section className="mx-auto max-w-[1280px] px-6 lg:px-10 pb-16">
         {filteredEvents.length === 0 ? (
-          <div className="rounded-2xl border border-black/[0.06] bg-white flex flex-col items-center justify-center py-32 text-center">
+          <div className="flex flex-col items-center justify-center py-32 text-center">
             <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse mb-6" />
             <h3 className="text-xl font-semibold text-[#111]">Waiting for the first prompt</h3>
             <p className="mt-3 max-w-md text-[15px] leading-relaxed text-[#666]">
@@ -184,9 +193,9 @@ export function LiveFeedApp() {
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="max-w-[860px]">
             {filteredEvents.map((event, i) => (
-              <PromptCard key={event.id} event={event} isLatest={i === 0} isFresh={freshIds.has(event.id)} />
+              <FeedItem key={event.id} event={event} isFresh={freshIds.has(event.id)} isRunning={runningIds.has(event.id)} isFirst={i === 0} />
             ))}
           </div>
         )}
@@ -195,74 +204,270 @@ export function LiveFeedApp() {
   );
 }
 
-function PromptCard({ event, isLatest, isFresh }: { event: PromptEvent; isLatest: boolean; isFresh: boolean }) {
+function FeedItem({ event, isFresh, isRunning, isFirst }: { event: PromptEvent; isFresh: boolean; isRunning: boolean; isFirst: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = event.prompt.length > 400 || event.prompt.split("\n").length > 8;
+
+  const hasTokens = (event.input_tokens || 0) + (event.output_tokens || 0) > 0;
+
+  const meta: React.ReactNode[] = [];
+  if ((event.source === "claude" || event.source === "codex") && event.model) {
+    const src = event.source === "claude"
+      ? "https://cdn.worldvectorlogo.com/logos/claude-logo.svg"
+      : "https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-avatar/avatars/codex.webp";
+    const alt = event.source === "claude" ? "Claude" : "Codex";
+    meta.push(
+      <span className="flex items-center gap-1">
+        <img src={src} alt={alt} className="h-3 w-auto" />
+        <span className="font-mono">{event.model}</span>
+      </span>
+    );
+  } else {
+    if (event.source) meta.push(sourceLabels[event.source] || event.source);
+    if (event.model) meta.push(event.model);
+  }
+  if (hasTokens) {
+    const cacheCreation = (event.metadata?.cache_creation_input_tokens as number) || 0;
+    const cacheRead = (event.metadata?.cache_read_input_tokens as number) || 0;
+    const nonCachedTokens = Math.max(0, (event.input_tokens || 0) - cacheCreation - cacheRead) + (event.output_tokens || 0);
+    meta.push(formatTokens(nonCachedTokens) + " tokens");
+    meta.push(formatCost(computeEventCost(event)));
+  }
+  const projectName = event.cwd ? event.cwd.split("/").filter(Boolean).pop() || null : null;
+
   return (
     <article
-      className={`rounded-2xl border bg-white px-6 py-5 transition-all duration-700 hover:shadow-md ${
-        isFresh
-          ? "border-emerald-300 shadow-lg shadow-emerald-100/50 ring-1 ring-emerald-200/40 animate-[slideIn_0.4s_ease-out]"
-          : isLatest
-            ? "border-emerald-200/60 shadow-sm"
-            : "border-black/[0.06]"
-      }`}
-      style={isFresh ? { borderLeftWidth: "3px", borderLeftColor: "#34d399" } : undefined}
+      className={`relative border-b border-[#f0f0f0] transition-colors duration-700 ${
+        isFresh ? "bg-emerald-50/40" : ""
+      } ${isFirst ? "" : ""}`}
+      style={isFresh ? { animation: "feedSlideIn 0.35s ease-out" } : undefined}
     >
-      <div className="flex items-start gap-4">
-        <Avatar event={event} />
+      <div className="flex gap-4 py-5">
+        {projectName && (
+          <div className="flex items-center shrink-0 self-start pt-1">
+            <div className="flex items-center gap-1.5 rounded-lg bg-[#f5f5f5] px-2.5 py-1.5">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="shrink-0 text-[#999]">
+                <path d="M1.5 3a1.5 1.5 0 011.5-1.5h3.19a1.5 1.5 0 011.06.44L8.56 3.25a.5.5 0 00.35.15H13a1.5 1.5 0 011.5 1.5v7.6a1.5 1.5 0 01-1.5 1.5H3A1.5 1.5 0 011.5 12.5V3z" stroke="currentColor" strokeWidth="1.2" />
+              </svg>
+              <span className="text-[12px] font-medium text-[#666] max-w-[100px] truncate">{projectName}</span>
+            </div>
+          </div>
+        )}
+        <div className="flex flex-col items-center shrink-0 pt-0.5">
+          <div className="size-9 overflow-hidden rounded-full bg-gradient-to-br from-[#eee] to-[#ddd]">
+            {validAvatarUrl(event.avatar_url) ? (
+              <Image
+                src={validAvatarUrl(event.avatar_url)!}
+                alt={event.user_name}
+                width={36}
+                height={36}
+                className="size-9 object-cover"
+              />
+            ) : (
+              <div className="grid size-9 place-items-center text-[11px] font-semibold text-[#888]">
+                {initialsFor(event.user_name)}
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[15px] font-semibold text-[#111]">{event.user_name}</span>
-            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${sourceColors[event.source]}`}>
-              {sourceLabels[event.source]}
-            </span>
-            {isFresh && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 animate-pulse">
-                NEW
+          <div className="flex items-center gap-2">
+            <span className="text-[14px] font-semibold text-[#111]">{event.user_name}</span>
+            <span className="text-[12px] text-[#ccc]">{relativeTime(event.created_at)}</span>
+          </div>
+
+          <p className={`mt-1.5 whitespace-pre-wrap break-words text-[15px] leading-[1.6] text-[#222] ${isLong && !expanded ? "line-clamp-5" : ""}`}>
+            {event.prompt}
+          </p>
+          {isLong && (
+            <button onClick={() => setExpanded(!expanded)} className="mt-1 text-[13px] font-medium text-[#aaa] hover:text-[#666] transition-colors">
+              {expanded ? "Show less" : "Show more"}
+            </button>
+          )}
+
+          <div className="mt-2 flex flex-wrap items-center gap-x-1.5 text-[12px] text-[#bbb]">
+            {meta.map((item, i) => (
+              <span key={i} className="flex items-center gap-1.5">
+                {i > 0 && <span className="text-[#e0e0e0]">&middot;</span>}
+                {typeof item === "string" ? <span className="font-mono">{item}</span> : item}
+              </span>
+            ))}
+            {isRunning && (
+              <span className="flex items-center gap-1.5">
+                {meta.length > 0 && <span className="text-[#e0e0e0]">&middot;</span>}
+                <span className="inline-flex items-center gap-1 font-mono text-[#ccc]">
+                  <svg className="w-3 h-3 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="8" cy="8" r="6" strokeOpacity="0.3" />
+                    <path d="M8 2a6 6 0 0 1 6 6" strokeLinecap="round" />
+                  </svg>
+                  running…
+                </span>
               </span>
             )}
-            <span className={`text-xs ml-auto shrink-0 ${isFresh ? "text-emerald-500 font-medium" : "text-[#bbb]"}`}>{relativeTime(event.created_at)}</span>
           </div>
-          {event.cwd && (
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-[#999]">
-              <span className="font-mono truncate">{event.machine_id}</span>
-              <span className="text-[#ddd]">/</span>
-              <span className="font-mono truncate">{event.cwd}</span>
-            </div>
-          )}
-          <p className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-[#333]">{event.prompt}</p>
-          {(event.model || event.token_count) && (
-            <div className="mt-3 flex items-center gap-3">
-              {event.model && (
-                <span className="rounded-lg bg-[#f5f5f5] px-2 py-1 text-[11px] font-medium text-[#888]">{event.model}</span>
-              )}
-              {event.token_count && (
-                <span className="text-[11px] text-[#bbb]">{event.token_count.toLocaleString()} tokens</span>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </article>
   );
 }
 
-function Avatar({ event }: { event: PromptEvent }) {
-  const initials = initialsFor(event.user_name);
-  const avatarUrl = validAvatarUrl(event.avatar_url);
+const ACTIVE_THRESHOLD_MS = 5 * 60_000;
+
+function PresenceBar({ events }: { events: PromptEvent[] }) {
+  const users = new Map<string, { name: string; avatarUrl: string | null; lastSeen: number }>();
+  for (const e of events) {
+    const existing = users.get(e.user_name);
+    const t = new Date(e.created_at).getTime();
+    if (!existing || t > existing.lastSeen) {
+      users.set(e.user_name, { name: e.user_name, avatarUrl: e.avatar_url, lastSeen: t });
+    }
+  }
+
+  const sorted = Array.from(users.values()).sort((a, b) => b.lastSeen - a.lastSeen);
+  const now = Date.now();
 
   return (
-    <div className="size-10 overflow-hidden rounded-full bg-gradient-to-br from-[#eee] to-[#ddd] shrink-0">
-      {avatarUrl ? (
-        <Image
-          src={avatarUrl}
-          alt={event.user_name}
-          width={40}
-          height={40}
-          className="size-10 object-cover"
-        />
-      ) : (
-        <div className="grid size-10 place-items-center text-xs font-semibold text-[#888]">{initials}</div>
-      )}
+    <section className="mx-auto max-w-[1280px] px-6 lg:px-10 pb-6">
+      <div className="flex justify-center gap-8 overflow-x-auto py-2">
+        {sorted.map((user) => {
+          const isActive = now - user.lastSeen < ACTIVE_THRESHOLD_MS;
+          return (
+            <div key={user.name} className="flex flex-col items-center gap-2 shrink-0">
+              <div className="relative">
+                {isActive ? <LaptopOpenIcon /> : <LaptopClosedIcon />}
+                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${isActive ? "bg-emerald-400" : "bg-[#ccc]"}`} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                {validAvatarUrl(user.avatarUrl) ? (
+                  <Image src={validAvatarUrl(user.avatarUrl)!} alt={user.name} width={18} height={18} className="size-[18px] rounded-full object-cover" />
+                ) : (
+                  <div className="grid size-[18px] place-items-center rounded-full bg-gradient-to-br from-[#eee] to-[#ddd] text-[8px] font-semibold text-[#888]">
+                    {initialsFor(user.name)}
+                  </div>
+                )}
+                <span className={`text-[13px] font-medium truncate max-w-[100px] ${isActive ? "text-[#111]" : "text-[#aaa]"}`}>
+                  {user.name}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function FileIcon({ filename }: { filename: string }) {
+  const ext = filename.includes(".") ? filename.split(".").pop()?.toLowerCase() : null;
+  let color = "#999";
+  let label = "";
+  if (ext === "ts" || ext === "tsx") { color = "#3178C6"; label = "TS"; }
+  else if (ext === "js" || ext === "jsx") { color = "#F7DF1E"; label = "JS"; }
+  else if (ext === "py") { color = "#3776AB"; label = "PY"; }
+  else if (ext === "rs") { color = "#DEA584"; label = "RS"; }
+  else if (ext === "go") { color = "#00ADD8"; label = "GO"; }
+  else if (ext === "rb") { color = "#CC342D"; label = "RB"; }
+  else if (ext === "css" || ext === "scss") { color = "#663399"; label = "CSS"; }
+  else if (ext === "json") { color = "#A4A4A4"; label = "{ }"; }
+  else if (ext === "md" || ext === "mdx") { color = "#555"; label = "MD"; }
+
+  if (label) {
+    return (
+      <span className="flex items-center justify-center w-4 h-4 rounded text-[7px] font-bold text-white leading-none" style={{ backgroundColor: color }}>
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="shrink-0">
+      <path d="M3 1.5h6.5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-13z" stroke="#999" strokeWidth="1.2" />
+      <path d="M9.5 1.5V5H13" stroke="#999" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+function LaptopOpenIcon() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const pixelSize = 3;
+    const cols = Math.ceil(w / pixelSize);
+    const rows = Math.ceil(h / pixelSize);
+    const palette = [
+      [180, 130, 220], [100, 180, 255], [255, 160, 120],
+      [120, 220, 170], [220, 140, 200], [160, 180, 255],
+      [255, 190, 100], [100, 210, 220], [200, 150, 240],
+    ];
+
+    let grid = Array.from({ length: rows }, () =>
+      Array.from({ length: cols }, () => palette[Math.floor(Math.random() * palette.length)])
+    );
+
+    const draw = () => {
+      const imageData = ctx.createImageData(w, h);
+      const data = imageData.data;
+      const changeFraction = 0.15;
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          if (Math.random() < changeFraction) {
+            grid[row][col] = palette[Math.floor(Math.random() * palette.length)];
+          }
+          const color = grid[row][col];
+          const brightness = 0.85 + Math.random() * 0.15;
+          for (let py = 0; py < pixelSize && row * pixelSize + py < h; py++) {
+            for (let px = 0; px < pixelSize && col * pixelSize + px < w; px++) {
+              const idx = ((row * pixelSize + py) * w + col * pixelSize + px) * 4;
+              data[idx] = color[0] * brightness;
+              data[idx + 1] = color[1] * brightness;
+              data[idx + 2] = color[2] * brightness;
+              data[idx + 3] = 255;
+            }
+          }
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
+    };
+
+    draw();
+    const interval = setInterval(draw, 600);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="relative" style={{ width: 72, height: 56 }}>
+      <svg width="72" height="56" viewBox="0 0 72 56" fill="none" className="absolute inset-0 text-[#555]">
+        <rect x="8" y="4" width="56" height="38" rx="3" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M4 46h64" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M28 46l-2 4h20l-2-4" stroke="currentColor" strokeWidth="1.2" fill="none" />
+      </svg>
+      <canvas
+        ref={canvasRef}
+        width={48}
+        height={30}
+        className="absolute rounded-[1px]"
+        style={{ top: 8, left: 12 }}
+      />
+    </div>
+  );
+}
+
+function LaptopClosedIcon() {
+  return (
+    <div className="relative" style={{ width: 72, height: 56 }}>
+      <svg width="72" height="56" viewBox="0 0 72 56" fill="none" className="text-[#ccc]">
+        <rect x="8" y="30" width="56" height="6" rx="2" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M4 46h64" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M28 46l-2 4h20l-2-4" stroke="currentColor" strokeWidth="1.2" fill="none" />
+      </svg>
     </div>
   );
 }

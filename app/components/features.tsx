@@ -10,7 +10,7 @@ const features = [
     ),
   },
   {
-    title: "Token leaderboard",
+    title: "Token tracking",
     description:
       "Friendly competition meets real data. See who's shipping the most with AI, track usage trends, and celebrate your top builders with weekly and all-time rankings.",
     icon: (

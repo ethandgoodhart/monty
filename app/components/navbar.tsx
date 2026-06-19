@@ -21,8 +21,8 @@ export function Navbar() {
         <div className="flex flex-1 items-center gap-6">
           <Link href="/" className="flex items-center"><MontyLogo /></Link>
           <div className="hidden sm:flex items-center gap-4 text-sm">
-            <Link href="/feed" className="text-[#999] hover:text-[#111] font-medium transition-colors">Feed</Link>
-            <Link href="/leaderboard" className="text-[#999] hover:text-[#111] font-medium transition-colors">Leaderboard</Link>
+            <Link href="/feed" className="text-[#999] hover:text-[#111] font-medium transition-colors">Live</Link>
+            <Link href="/leaderboard" className="text-[#999] hover:text-[#111] font-medium transition-colors">Tokens</Link>
           </div>
         </div>
         <div className="flex flex-1 items-center justify-end gap-5">

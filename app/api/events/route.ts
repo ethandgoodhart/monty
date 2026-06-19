@@ -48,14 +48,67 @@ export async function POST(request: NextRequest) {
 
   const supabase = getServerSupabase();
   if (supabase) {
-    const { data, error } = await supabase.from(PROMPT_EVENTS_TABLE).insert(event).select("*").single();
+    event.metadata.input_tokens = event.input_tokens;
+    event.metadata.output_tokens = event.output_tokens;
+    const { input_tokens: _i, output_tokens: _o, ...dbEvent } = event as Record<string, unknown>;
+    const { data, error } = await supabase.from(PROMPT_EVENTS_TABLE).insert(dbEvent).select("*").single();
     if (!error && data) {
-      await addLocalEvent(data);
       return NextResponse.json({ event: normalizePromptEvent(data) }, { status: 201 });
     }
 
-    console.error("Supabase insert failed, falling back to local store:", error);
+    console.error("Supabase insert failed, falling back to local store:", JSON.stringify(error));
   }
 
   return NextResponse.json({ event: await addLocalEvent(event) }, { status: 201 });
+}
+
+export async function PATCH(request: NextRequest) {
+  const token = process.env.MONTY_INGEST_TOKEN;
+  if (token) {
+    const auth = request.headers.get("authorization");
+    if (auth !== `Bearer ${token}`) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+  }
+
+  const body = await request.json().catch(() => null);
+  if (!body || !body.session_id || !body.prompt) {
+    return NextResponse.json({ error: "session_id and prompt required" }, { status: 400 });
+  }
+
+  const supabase = getServerSupabase();
+  if (!supabase) {
+    return NextResponse.json({ error: "no database" }, { status: 500 });
+  }
+
+  const inputTokens = body.input_tokens || 0;
+  const outputTokens = body.output_tokens || 0;
+  const cacheCreation = body.cache_creation_input_tokens || 0;
+  const cacheRead = body.cache_read_input_tokens || 0;
+
+  const { data, error } = await supabase
+    .from(PROMPT_EVENTS_TABLE)
+    .update({
+      token_count: inputTokens + outputTokens,
+      model: body.model || undefined,
+      metadata: {
+        cli: "claude",
+        hook_event_name: "Stop",
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        cache_creation_input_tokens: cacheCreation,
+        cache_read_input_tokens: cacheRead,
+      },
+    })
+    .eq("session_id", body.session_id)
+    .eq("prompt", body.prompt)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .select("*");
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ updated: data?.length ?? 0 });
 }
