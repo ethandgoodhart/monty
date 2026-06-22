@@ -219,13 +219,14 @@ export function CodeMapApp() {
             );
           })}
 
-          {/* Walking character */}
+          {/* Walking character — temporarily disabled
           <div
             className="absolute"
             style={{ left: 1000 - 900, top: 1000 - 525, width: 1800, height: 1050 }}
           >
             <WalkingCharacter />
           </div>
+          */}
         </div>
 
         {/* Bottom commit bar */}
