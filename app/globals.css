@@ -112,3 +112,12 @@ body {
   color: transparent;
   animation: velocity-shimmer 3s ease-in-out infinite;
 }
+
+.building-asset {
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
+.group:hover .building-asset {
+  filter: grayscale(1) sepia(1) hue-rotate(180deg) saturate(6) brightness(0.85) drop-shadow(0 0 20px rgba(80, 160, 255, 0.7));
+  opacity: 0.85;
+}

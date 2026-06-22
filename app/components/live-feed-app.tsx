@@ -142,6 +142,7 @@ export function LiveFeedApp() {
             <div className="hidden sm:flex items-center gap-4 text-sm ml-2">
               <Link href="/feed" className="text-[#111] font-medium">Live</Link>
               <Link href="/leaderboard" className="text-[#999] hover:text-[#111] font-medium transition-colors">Tokens</Link>
+              <Link href="/code" className="text-[#999] hover:text-[#111] font-medium transition-colors">Code</Link>
             </div>
           </div>
           <div className="flex flex-1 items-center justify-end gap-5">
@@ -334,32 +335,62 @@ function FeedItem({ event, isFresh, isRunning, isFirst }: { event: PromptEvent; 
   );
 }
 
-const ACTIVE_THRESHOLD_MS = 5 * 60_000;
+type UserPresence = { lid_closed: boolean; sessions: { claude: number; codex: number } };
+type AllPresence = Record<string, UserPresence>;
+
+function usePresence() {
+  const [presence, setPresence] = useState<AllPresence>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/lid-state");
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) setPresence(data.users || {});
+        }
+      } catch {}
+    };
+    poll();
+    const interval = setInterval(poll, 1500);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  return presence;
+}
 
 function PresenceBar({ events }: { events: PromptEvent[] }) {
-  const users = new Map<string, { name: string; avatarUrl: string | null; lastSeen: number }>();
+  const presence = usePresence();
+  const users = new Map<string, { name: string; avatarUrl: string | null; lastSeen: number; lastPrompt: string }>();
   for (const e of events) {
     const existing = users.get(e.user_name);
     const t = new Date(e.created_at).getTime();
     if (!existing || t > existing.lastSeen) {
-      users.set(e.user_name, { name: e.user_name, avatarUrl: e.avatar_url, lastSeen: t });
+      users.set(e.user_name, { name: e.user_name, avatarUrl: e.avatar_url, lastSeen: t, lastPrompt: e.prompt || "" });
     }
   }
 
   const sorted = Array.from(users.values()).sort((a, b) => b.lastSeen - a.lastSeen);
-  const now = Date.now();
 
   return (
     <section className="mx-auto max-w-[1280px] px-6 lg:px-10 pb-6">
       <div className="flex justify-center gap-8 overflow-x-auto py-2">
         {sorted.map((user) => {
-          const isActive = now - user.lastSeen < ACTIVE_THRESHOLD_MS;
+          const userPresence = presence[user.name];
+          const isLidOpen = userPresence ? !userPresence.lid_closed : false;
+          const sessions = userPresence?.sessions ?? { claude: 0, codex: 0 };
           return (
             <div key={user.name} className="flex flex-col items-center gap-2 shrink-0">
               <div className="relative">
-                {isActive ? <LaptopOpenIcon /> : <LaptopClosedIcon />}
-                <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${isActive ? "bg-emerald-400" : "bg-[#ccc]"}`} />
+                {isLidOpen ? <LaptopOpenIcon sessions={sessions} /> : <LaptopClosedIcon />}
+                <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${isLidOpen ? "bg-emerald-400" : "bg-[#ccc]"}`} />
               </div>
+              {user.lastPrompt && (
+                <p className={`text-[11px] italic truncate max-w-[140px] ${isLidOpen ? "text-[#666]" : "text-[#bbb]"}`}>
+                  &ldquo;{user.lastPrompt}&rdquo;
+                </p>
+              )}
               <div className="flex items-center gap-1.5">
                 {validAvatarUrl(user.avatarUrl) ? (
                   <Image src={validAvatarUrl(user.avatarUrl)!} alt={user.name} width={18} height={18} className="size-[18px] rounded-full object-cover" />
@@ -368,7 +399,7 @@ function PresenceBar({ events }: { events: PromptEvent[] }) {
                     {initialsFor(user.name)}
                   </div>
                 )}
-                <span className={`text-[13px] font-medium truncate max-w-[100px] ${isActive ? "text-[#111]" : "text-[#aaa]"}`}>
+                <span className={`text-[13px] font-medium truncate max-w-[100px] ${isLidOpen ? "text-[#111]" : "text-[#aaa]"}`}>
                   {user.name}
                 </span>
               </div>
@@ -410,77 +441,96 @@ function FileIcon({ filename }: { filename: string }) {
   );
 }
 
-function LaptopOpenIcon() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+function LaptopOpenIcon({ sessions }: { sessions: { claude: number; codex: number } }) {
+  const total = sessions.claude + sessions.codex;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const terminalWindows = () => {
+    if (total === 0) {
+      return (
+        <rect x="10" y="6" width="52" height="34" rx="1.5" fill="#1a1a2e" />
+      );
+    }
 
-    const w = canvas.width;
-    const h = canvas.height;
-    const pixelSize = 3;
-    const cols = Math.ceil(w / pixelSize);
-    const rows = Math.ceil(h / pixelSize);
-    const palette = [
-      [180, 130, 220], [100, 180, 255], [255, 160, 120],
-      [120, 220, 170], [220, 140, 200], [160, 180, 255],
-      [255, 190, 100], [100, 210, 220], [200, 150, 240],
-    ];
+    const windows: React.ReactNode[] = [];
+    const items: Array<{ type: "claude" | "codex" }> = [];
+    for (let i = 0; i < sessions.claude; i++) items.push({ type: "claude" });
+    for (let i = 0; i < sessions.codex; i++) items.push({ type: "codex" });
 
-    let grid = Array.from({ length: rows }, () =>
-      Array.from({ length: cols }, () => palette[Math.floor(Math.random() * palette.length)])
-    );
+    const screenX = 10;
+    const screenY = 6;
+    const screenW = 52;
+    const screenH = 34;
+    const pad = 1.5;
+    const colors = { claude: "#1a1a2e", codex: "#0d1b2a" };
 
-    const draw = () => {
-      const imageData = ctx.createImageData(w, h);
-      const data = imageData.data;
-      const changeFraction = 0.15;
-      for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-          if (Math.random() < changeFraction) {
-            grid[row][col] = palette[Math.floor(Math.random() * palette.length)];
-          }
-          const color = grid[row][col];
-          const brightness = 0.85 + Math.random() * 0.15;
-          for (let py = 0; py < pixelSize && row * pixelSize + py < h; py++) {
-            for (let px = 0; px < pixelSize && col * pixelSize + px < w; px++) {
-              const idx = ((row * pixelSize + py) * w + col * pixelSize + px) * 4;
-              data[idx] = color[0] * brightness;
-              data[idx + 1] = color[1] * brightness;
-              data[idx + 2] = color[2] * brightness;
-              data[idx + 3] = 255;
-            }
-          }
-        }
-      }
-      ctx.putImageData(imageData, 0, 0);
+    const claudeSvgUrl = "https://cdn.worldvectorlogo.com/logos/claude-logo.svg";
+
+    const renderPane = (item: { type: "claude" | "codex" }, x: number, y: number, w: number, h: number, key: number, iconPct: number = 42) => {
+      const logo = item.type === "claude" ? claudeSvgUrl : "/logos/codex.png";
+      const iconW = w * iconPct / 100;
+      const iconH = h * iconPct / 100;
+      const iconX = x + (w - iconW) / 2;
+      const iconY = y + (h - iconH) / 2;
+      return (
+        <g key={key}>
+          <rect x={x} y={y} width={w} height={h} rx="1.5" fill={colors[item.type]} />
+          <image href={logo} x={iconX} y={iconY} width={iconW} height={iconH} />
+        </g>
+      );
     };
 
-    draw();
-    const interval = setInterval(draw, 600);
-    return () => clearInterval(interval);
-  }, []);
+    if (items.length === 1) {
+      windows.push(renderPane(items[0], screenX + pad, screenY + pad, screenW - pad * 2, screenH - pad * 2, 0, 42));
+    } else if (items.length === 2) {
+      const halfW = (screenW - pad * 3) / 2;
+      items.forEach((item, i) => {
+        const x = screenX + pad + i * (halfW + pad);
+        windows.push(renderPane(item, x, screenY + pad, halfW, screenH - pad * 2, i, 42));
+      });
+    } else if (items.length <= 4) {
+      const halfW = (screenW - pad * 3) / 2;
+      const halfH = (screenH - pad * 3) / 2;
+      items.slice(0, 4).forEach((item, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const x = screenX + pad + col * (halfW + pad);
+        const y = screenY + pad + row * (halfH + pad);
+        windows.push(renderPane(item, x, y, halfW, halfH, i, 42));
+      });
+    } else {
+      const cols = 3;
+      const rows = Math.ceil(Math.min(items.length, 9) / cols);
+      const cellW = (screenW - pad * (cols + 1)) / cols;
+      const cellH = (screenH - pad * (rows + 1)) / rows;
+      items.slice(0, 9).forEach((item, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = screenX + pad + col * (cellW + pad);
+        const y = screenY + pad + row * (cellH + pad);
+        windows.push(renderPane(item, x, y, cellW, cellH, i, 42));
+      });
+    }
+
+    return (
+      <>
+        <rect x={screenX} y={screenY} width={screenW} height={screenH} rx="2" fill="#111" />
+        {windows}
+      </>
+    );
+  };
 
   return (
     <div className="relative" style={{ width: 144, height: 112 }}>
       <svg width="144" height="112" viewBox="0 0 72 56" fill="none" className="absolute inset-0 text-[#555]">
         <rect x="8" y="4" width="56" height="38" rx="3" stroke="currentColor" strokeWidth="0.75" />
+        {terminalWindows()}
         <path d="M4 46h64" stroke="currentColor" strokeWidth="0.75" strokeLinecap="round" />
         <path d="M28 46l-2 4h20l-2-4" stroke="currentColor" strokeWidth="0.6" fill="none" />
       </svg>
-      <canvas
-        ref={canvasRef}
-        width={96}
-        height={60}
-        className="absolute rounded-[2px]"
-        style={{ top: 16, left: 24 }}
-      />
     </div>
   );
 }
+
 
 function LaptopClosedIcon() {
   return (

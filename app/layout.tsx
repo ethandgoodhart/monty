@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Monty — See what your team is building with AI",
+  title: "Monty",
   description: "Monty is a CLI extension for Claude Code and Codex that gives your team a live prompt feed and token leaderboard. See who's shipping, what they're building, and how your AI budget is being spent.",
   icons: {
     icon: "/monty-favicon.png",

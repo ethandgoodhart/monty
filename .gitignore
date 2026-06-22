@@ -36,6 +36,9 @@ yarn-error.log*
 # monty local data
 .monty-data/
 
+# supabase
+supabase/.temp/
+
 # vercel
 .vercel
 

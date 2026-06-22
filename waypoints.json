@@ -1,0 +1,28 @@
+[
+  {
+    "index": 0,
+    "pos3D": [
+      3.897,
+      0.802
+    ],
+    "worldPixel": [
+      1219,
+      1192
+    ],
+    "angleDeg": -101.8,
+    "angleRad": -1.777
+  },
+  {
+    "index": 1,
+    "pos3D": [
+      5.999,
+      -0.577
+    ],
+    "worldPixel": [
+      1465,
+      1221
+    ],
+    "angleDeg": -167,
+    "angleRad": -2.914
+  }
+]

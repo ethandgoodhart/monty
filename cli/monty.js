@@ -4,7 +4,7 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
+const { spawnSync, execSync } = require("node:child_process");
 
 const home = os.homedir();
 const montyDir = path.join(home, ".monty");
@@ -22,6 +22,7 @@ async function main() {
     if (command === "hook") return hookCommandHandler(args);
     if (command === "run") return runWrapped(args);
     if (command === "sync") return syncHistory(args);
+    if (command === "daemon") return daemon(args);
     if (command === "doctor") return doctor();
     if (command === "help" || command === "--help" || command === "-h") return help();
 
@@ -60,12 +61,15 @@ async function install(args) {
   upsertHookJson(codexPath, "codex");
   upsertCodexOtelConfig(codexConfigPath, config);
 
+  installLaunchdDaemon();
+
   console.log(`Monty installed for ${config.teamId}`);
   console.log(`Site: ${config.siteUrl}`);
   if (config.githubLogin) console.log(`GitHub avatar: ${config.githubLogin}`);
   console.log(`Claude hook: ${claudePath}`);
   console.log(`Codex hook: ${codexPath}`);
   console.log(`Codex telemetry: ${codexConfigPath}`);
+  console.log(`Daemon: com.monty.daemon (launchd)`);
   console.log("");
 
   if (!options["no-sync"]) {
@@ -284,6 +288,63 @@ async function sendHeartbeat() {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function detectLidClosed() {
+  try {
+    const out = execSync("ioreg -r -k AppleClamshellState -d 4 | grep AppleClamshellState | head -1", { encoding: "utf8", timeout: 3000 });
+    if (out.includes("Yes")) return true;
+    if (out.includes("No")) return false;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function detectSessions() {
+  let claude = 0;
+  let codex = 0;
+  try { claude = parseInt(execSync("pgrep -x claude 2>/dev/null | wc -l", { encoding: "utf8", timeout: 2000 }).trim(), 10) || 0; } catch {}
+  try { codex = parseInt(execSync("pgrep -x codex 2>/dev/null | wc -l", { encoding: "utf8", timeout: 2000 }).trim(), 10) || 0; } catch {}
+  return { claude, codex };
+}
+
+async function sendPresence() {
+  const config = readConfig();
+  const siteUrl = cleanUrl(config.siteUrl || process.env.MONTY_SITE_URL || "https://www.trymonty.ai");
+  const headers = { "content-type": "application/json" };
+  const token = config.ingestToken || process.env.MONTY_INGEST_TOKEN;
+  if (token) headers.authorization = `Bearer ${token}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    await fetch(`${siteUrl}/api/lid-state`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        user_name: config.userName || process.env.MONTY_USER || process.env.USER || "unknown",
+        team_id: config.teamId || process.env.MONTY_TEAM_ID || "default",
+        lid_closed: detectLidClosed(),
+        sessions: detectSessions(),
+      }),
+      signal: controller.signal,
+    });
+  } catch {}
+  finally { clearTimeout(timeout); }
+}
+
+async function daemon(args) {
+  const options = parseArgs(args);
+  const intervalSec = Number(options.interval) || 5;
+  console.log(`Monty daemon running (every ${intervalSec}s). Press Ctrl+C to stop.`);
+
+  const tick = async () => {
+    await sendPresence().catch(() => {});
+  };
+
+  await tick();
+  setInterval(tick, intervalSec * 1000);
 }
 
 async function runWrapped(args) {
@@ -668,6 +729,50 @@ function doctor() {
   }
 }
 
+function installLaunchdDaemon() {
+  const label = "com.monty.daemon";
+  const plistPath = path.join(home, "Library", "LaunchAgents", `${label}.plist`);
+  const logPath = path.join(montyDir, "daemon.log");
+
+  const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${process.execPath}</string>
+    <string>${installedCliPath}</string>
+    <string>daemon</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${logPath}</string>
+  <key>StandardErrorPath</key>
+  <string>${logPath}</string>
+</dict>
+</plist>
+`;
+
+  try {
+    spawnSync("launchctl", ["unload", plistPath], { stdio: "ignore" });
+  } catch {}
+
+  fs.mkdirSync(path.dirname(plistPath), { recursive: true });
+  fs.writeFileSync(plistPath, plist);
+
+  const result = spawnSync("launchctl", ["load", plistPath], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  if (result.status === 0) {
+    console.log(`Daemon started (${label})`);
+  } else {
+    console.log(`Daemon plist written to ${plistPath} (launchctl load may need manual run)`);
+  }
+}
+
 function upsertHookJson(filePath, source) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const data = readJson(filePath, {});
@@ -964,6 +1069,7 @@ function help() {
 Usage:
   monty install --site http://localhost:3000 --team default
   monty sync                      Sync all Claude Code & Codex history with real token counts
+  monty daemon                    Run background presence reporter (lid state + session count)
   monty capture --source test --prompt "hello"
   monty run codex exec "prompt"
   monty run claude -p "prompt"

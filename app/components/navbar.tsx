@@ -23,6 +23,7 @@ export function Navbar() {
           <div className="hidden sm:flex items-center gap-4 text-sm ml-2">
             <Link href="/feed" className="text-[#999] hover:text-[#111] font-medium transition-colors">Live</Link>
             <Link href="/leaderboard" className="text-[#999] hover:text-[#111] font-medium transition-colors">Tokens</Link>
+            <Link href="/code" className="text-[#999] hover:text-[#111] font-medium transition-colors">Code</Link>
           </div>
         </div>
         <div className="flex flex-1 items-center justify-end gap-5">

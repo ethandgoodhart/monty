@@ -1,6 +1,6 @@
 {
-  "name": "monty-dev",
-  "version": "0.1.1",
+  "name": "monty-cli",
+  "version": "0.1.5",
   "description": "Live AI prompt feed and token leaderboard for your engineering team. Works with Claude Code and Codex CLI.",
   "license": "MIT",
   "bin": {
