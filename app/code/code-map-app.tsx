@@ -219,7 +219,7 @@ export function CodeMapApp() {
             );
           })}
 
-          {/* Walking character + debug dots — above buildings for editing */}
+          {/* Walking character */}
           <div
             className="absolute"
             style={{ left: 1000 - 900, top: 1000 - 525, width: 1800, height: 1050 }}
