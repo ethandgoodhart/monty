@@ -37,11 +37,11 @@ body {
 
 .title pre {
   font-family: monospace;
-  font-size: clamp(5px, 0.75vw, 10px);
+  font-size: clamp(6px, 1vw, 13px);
   line-height: 1.2;
   font-weight: 700;
-  padding: 24px 32px;
-  background: rgba(0, 0, 0, 0.45);
+  padding: 28px 40px;
+  background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(3px);
   text-shadow:
     0 0 2px rgba(0, 0, 0, 1),
