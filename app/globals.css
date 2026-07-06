@@ -48,9 +48,9 @@ body {
     rgba(0, 0, 0, 0) 100%
   ); */
   text-shadow:
-    0 0 2px rgba(0, 0, 0, 1),
-    0 0 6px rgba(0, 0, 0, 1),
-    0 0 14px rgba(0, 0, 0, 0.9);
+    0 0 2px #ffffff,
+    0 0 6px #c4c4c4,
+    0 0 14px #474747e6;
 }
 
 .contact {
@@ -60,13 +60,13 @@ body {
   transform: translateX(-50%);
   z-index: 2;
   padding: 14px 36px;
-  border: 1px solid #fff;
+  border: none;
   border-radius: 0;
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
   font-family: monospace;
   font-size: 14px;
-  letter-spacing: 0.25em;
+  letter-spacing: 0;
   text-transform: uppercase;
   text-decoration: none;
   backdrop-filter: blur(4px);
