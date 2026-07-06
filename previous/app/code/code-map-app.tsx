@@ -10,25 +10,79 @@ const WalkingCharacter = dynamic(
   { ssr: false }
 );
 
-
 const INSTALL_CMD = "npx monty-cli install";
 
-const buildings = [
-  { id: "terminal", label: "cli", subtitle: "CLI Tool", img: "/city-terminal.png", x: -400, y: 50 },
-  { id: "hq", label: "monty", subtitle: "Next.js App", img: "/city-hq.webm", x: 0, y: 0 },
-  { id: "supabase", label: "supabase", subtitle: "Backend & DB", img: "/city-supabase.png", x: 400, y: 50 },
-  { id: "docs", label: "docs", subtitle: "Documentation", img: "/city-docs.png", x: 0, y: 350 },
+const BUILDING_DEFS = [
+  { id: "terminal", label: "cli", subtitle: "CLI Tool", img: "/city-terminal.png", gridSize: 9 },
+  { id: "hq", label: "monty", subtitle: "Next.js App", img: "/city-hq.webm", gridSize: 12 },
+  { id: "supabase", label: "supabase", subtitle: "Backend & DB", img: "/city-supabase.png", gridSize: 9 },
+  { id: "docs", label: "docs", subtitle: "Documentation", img: "/city-docs.png", gridSize: 9 },
 ];
+
+const INITIAL_POSITIONS: Record<string, { x: number; y: number }> = {
+  terminal: { x: -400, y: 50 },
+  hq: { x: 0, y: 0 },
+  supabase: { x: 400, y: 50 },
+  docs: { x: 0, y: 350 },
+};
 
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 2.5;
+
+const GRID_N = 60;
+const ISO_OX = 900, ISO_OY = 30;
+const AX = 850 / 60, AY = 495 / 60;
+const BX = -850 / 60, BY = 495 / 60;
+const SVG_LEFT = 100, SVG_TOP = 475;
+
+function worldToGrid(wx: number, wy: number) {
+  const rx = wx - SVG_LEFT - ISO_OX;
+  const ry = wy - SVG_TOP - ISO_OY;
+  return { u: (ry / AY + rx / AX) / 2, v: (ry / AY - rx / AX) / 2 };
+}
+
+function cellPath(u: number, v: number) {
+  const px = (du: number, dv: number) =>
+    `${ISO_OX + (u + du) * AX + (v + dv) * BX},${ISO_OY + (u + du) * AY + (v + dv) * BY}`;
+  return `M${px(0, 0)}L${px(1, 0)}L${px(1, 1)}L${px(0, 1)}Z`;
+}
+
+function getFootprint(wx: number, wy: number, size: number) {
+  const { u, v } = worldToGrid(wx, wy);
+  const su = Math.round(u - size / 2);
+  const sv = Math.round(v - size / 2);
+  const cells: { u: number; v: number }[] = [];
+  for (let du = 0; du < size; du++)
+    for (let dv = 0; dv < size; dv++) {
+      const cu = su + du, cv = sv + dv;
+      if (cu >= 0 && cu < GRID_N && cv >= 0 && cv < GRID_N)
+        cells.push({ u: cu, v: cv });
+    }
+  return cells;
+}
+
+function screenToWorld(sx: number, sy: number, rect: DOMRect, cam: { x: number; y: number; zoom: number }) {
+  return {
+    x: (sx - rect.left - rect.width / 2) / cam.zoom - cam.x + 1000,
+    y: (sy - rect.top - rect.height / 2) / cam.zoom - cam.y + 1000,
+  };
+}
 
 export function CodeMapApp() {
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 0.75 });
-  const dragging = useRef(false);
+  const [positions, setPositions] = useState(INITIAL_POSITIONS);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isDraggingBuilding, setIsDraggingBuilding] = useState(false);
+
+  const panning = useRef(false);
+  const dragInfo = useRef<{ id: string; ox: number; oy: number; startX: number; startY: number } | null>(null);
   const lastMouse = useRef({ x: 0, y: 0 });
+  const camRef = useRef(camera);
+  camRef.current = camera;
+  const posRef = useRef(positions);
+  posRef.current = positions;
 
   const copyInstall = async () => {
     await navigator.clipboard.writeText(INSTALL_CMD);
@@ -38,34 +92,75 @@ export function CodeMapApp() {
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.92 : 1.08;
-    setCamera((prev) => ({
-      ...prev,
-      zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev.zoom * delta)),
-    }));
+    const factor = e.deltaY > 0 ? 0.92 : 1.08;
+    setCamera((p) => ({ ...p, zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, p.zoom * factor)) }));
   }, []);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    dragging.current = true;
-    lastMouse.current = { x: e.clientX, y: e.clientY };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, []);
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      const bEl = (e.target as HTMLElement).closest("[data-building-id]");
+
+      if (bEl) {
+        const id = bEl.getAttribute("data-building-id")!;
+        setSelectedId(id);
+        setIsDraggingBuilding(true);
+        const rect = containerRef.current!.getBoundingClientRect();
+        const w = screenToWorld(e.clientX, e.clientY, rect, camRef.current);
+        const pos = posRef.current[id];
+        dragInfo.current = { id, ox: w.x - (1000 + pos.x), oy: w.y - (1000 + pos.y), startX: pos.x, startY: pos.y };
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        return;
+      }
+
+      if (selectedId) {
+        setSelectedId(null);
+        setIsDraggingBuilding(false);
+        return;
+      }
+
+      panning.current = true;
+      lastMouse.current = { x: e.clientX, y: e.clientY };
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [selectedId]
+  );
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragging.current) return;
+    if (dragInfo.current) {
+      const rect = containerRef.current!.getBoundingClientRect();
+      const w = screenToWorld(e.clientX, e.clientY, rect, camRef.current);
+      const d = dragInfo.current;
+      setPositions((p) => ({ ...p, [d.id]: { x: w.x - d.ox - 1000, y: w.y - d.oy - 1000 } }));
+      return;
+    }
+    if (!panning.current) return;
     const dx = e.clientX - lastMouse.current.x;
     const dy = e.clientY - lastMouse.current.y;
     lastMouse.current = { x: e.clientX, y: e.clientY };
-    setCamera((prev) => ({
-      ...prev,
-      x: prev.x + dx / prev.zoom,
-      y: prev.y + dy / prev.zoom,
-    }));
+    setCamera((p) => ({ ...p, x: p.x + dx / p.zoom, y: p.y + dy / p.zoom }));
   }, []);
 
   const handlePointerUp = useCallback(() => {
-    dragging.current = false;
+    if (dragInfo.current) {
+      const d = dragInfo.current;
+      const def = BUILDING_DEFS.find((b) => b.id === d.id)!;
+      const pos = posRef.current[d.id];
+      const cells = getFootprint(1000 + pos.x, 1000 + pos.y, def.gridSize);
+      const collides = BUILDING_DEFS.some((b) => {
+        if (b.id === d.id) return false;
+        const op = posRef.current[b.id];
+        const oc = getFootprint(1000 + op.x, 1000 + op.y, b.gridSize);
+        const set = new Set(oc.map((c) => `${c.u},${c.v}`));
+        return cells.some((c) => set.has(`${c.u},${c.v}`));
+      });
+      if (collides) {
+        setPositions((p) => ({ ...p, [d.id]: { x: d.startX, y: d.startY } }));
+      }
+    }
+    dragInfo.current = null;
+    panning.current = false;
+    setIsDraggingBuilding(false);
   }, []);
 
   useEffect(() => {
@@ -74,6 +169,21 @@ export function CodeMapApp() {
     el.addEventListener("wheel", handleWheel, { passive: false });
     return () => el.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
+
+  const selectedDef = selectedId ? BUILDING_DEFS.find((b) => b.id === selectedId) : null;
+  const highlightCells = selectedDef
+    ? getFootprint(1000 + positions[selectedId!].x, 1000 + positions[selectedId!].y, selectedDef.gridSize)
+    : [];
+
+  const isColliding = selectedDef
+    ? BUILDING_DEFS.some((b) => {
+        if (b.id === selectedId) return false;
+        const op = positions[b.id];
+        const oc = getFootprint(1000 + op.x, 1000 + op.y, b.gridSize);
+        const set = new Set(oc.map((c) => `${c.u},${c.v}`));
+        return highlightCells.some((c) => set.has(`${c.u},${c.v}`));
+      })
+    : false;
 
   return (
     <main className="h-screen flex flex-col bg-white text-[#111] overflow-hidden">
@@ -103,13 +213,18 @@ export function CodeMapApp() {
 
       <div
         ref={containerRef}
-        className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing select-none"
-        // onPointerDown={handlePointerDown}
-        // onPointerMove={handlePointerMove}
-        // onPointerUp={handlePointerUp}
-        // onPointerLeave={handlePointerUp}
+        className={`flex-1 relative overflow-hidden select-none ${
+          isDraggingBuilding
+            ? "cursor-grabbing"
+            : selectedId
+              ? "cursor-default"
+              : "cursor-grab active:cursor-grabbing"
+        }`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
       >
-
         {/* World layer */}
         <div
           className="absolute"
@@ -147,8 +262,8 @@ export function CodeMapApp() {
             />
             {/* Isometric grid lines */}
             <g clipPath="url(#diamondClip)" stroke="#e4e4e8" strokeWidth="0.8">
-              {Array.from({ length: 21 }, (_, i) => {
-                const t = i / 20;
+              {Array.from({ length: 61 }, (_, i) => {
+                const t = i / 60;
                 return (
                   <line
                     key={`a${i}`}
@@ -159,8 +274,8 @@ export function CodeMapApp() {
                   />
                 );
               })}
-              {Array.from({ length: 21 }, (_, i) => {
-                const t = i / 20;
+              {Array.from({ length: 61 }, (_, i) => {
+                const t = i / 60;
                 return (
                   <line
                     key={`b${i}`}
@@ -178,19 +293,39 @@ export function CodeMapApp() {
               stroke="#e0e0e6"
               strokeWidth="1.5"
             />
+
+            {/* Highlighted grid cells under selected building */}
+            {highlightCells.map(({ u, v }) => (
+              <path
+                key={`hl-${u}-${v}`}
+                d={cellPath(u, v)}
+                fill={isColliding ? "rgba(239, 68, 68, 0.3)" : "rgba(34, 197, 94, 0.25)"}
+                stroke={isColliding ? "rgba(239, 68, 68, 0.6)" : "rgba(34, 197, 94, 0.5)"}
+                strokeWidth="1.5"
+              />
+            ))}
           </svg>
 
-          {buildings.map((b) => {
-            const size = b.id === "hq" ? 360 : 240;
+          {BUILDING_DEFS.map((b) => {
+            const pos = positions[b.id];
+            const size = b.id === "hq" ? 120 : 80;
             const isVideo = b.img.endsWith(".webm");
+            const isSelected = selectedId === b.id;
             return (
               <div
                 key={b.id}
-                className="absolute group"
+                data-building-id={b.id}
+                className="absolute"
                 style={{
-                  left: 1000 + b.x,
-                  top: 1000 + b.y,
-                  transform: "translate(-50%, -50%)",
+                  left: 1000 + pos.x,
+                  top: 1000 + pos.y,
+                  transform: `translate(-50%, -50%)${isSelected ? " scale(1.05)" : ""}`,
+                  transition: "transform 0.15s ease, filter 0.15s ease",
+                  cursor: isSelected ? "grab" : "pointer",
+                  zIndex: isSelected ? 10 : 1,
+                  filter: isSelected
+                    ? "drop-shadow(0 8px 24px rgba(0,0,0,0.15))"
+                    : undefined,
                 }}
               >
                 {isVideo ? (
@@ -202,7 +337,7 @@ export function CodeMapApp() {
                     playsInline
                     width={size}
                     height={size}
-                    className="drop-shadow-xl pointer-events-auto building-asset"
+                    className="drop-shadow-xl pointer-events-auto"
                     draggable={false}
                   />
                 ) : (
@@ -211,7 +346,7 @@ export function CodeMapApp() {
                     alt={b.label}
                     width={size}
                     height={size}
-                    className="drop-shadow-xl pointer-events-auto building-asset"
+                    className="drop-shadow-xl pointer-events-auto"
                     draggable={false}
                   />
                 )}
@@ -275,5 +410,3 @@ export function CodeMapApp() {
     </main>
   );
 }
-
-

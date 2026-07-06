@@ -1,123 +1,75 @@
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #111111;
-  --surface: #f5f5f5;
-  --panel: #e8e8e8;
-  --text-secondary: #666;
-  --muted: #999;
-  --border: rgba(0, 0, 0, 0.08);
-  --accent: #f5731a;
-  --accent-light: #ff9a3c;
-  --accent-dark: #e0590a;
-  --btn-radius: 10px;
-  --radius-xl: 16px;
-  --content-max-width: 1280px;
-  --scroll-padding-top: 5.25rem;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-html {
-  scroll-behavior: smooth;
-  scroll-padding-top: var(--scroll-padding-top);
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
 }
 
-@keyframes scroll-left {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-33.333%); }
+.ascii-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
 }
 
-@keyframes scroll-right {
-  0% { transform: translateX(-33.333%); }
-  100% { transform: translateX(0); }
+.ascii-bg canvas,
+.ascii-bg video {
+  width: 100vw !important;
+  height: 100vh !important;
+  object-fit: cover;
 }
 
-@keyframes hero-reveal {
-  0% {
-    opacity: 0;
-    filter: blur(12px);
-    transform: translateY(8px);
-  }
-  100% {
-    opacity: 1;
-    filter: blur(0px);
-    transform: translateY(0);
-  }
+.title {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: #fff;
 }
 
-.hero-reveal {
-  animation: hero-reveal 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.title pre {
+  font-family: monospace;
+  font-size: clamp(5px, 0.75vw, 10px);
+  line-height: 1.2;
+  font-weight: 700;
+  padding: 24px 32px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  text-shadow:
+    0 0 2px rgba(0, 0, 0, 1),
+    0 0 6px rgba(0, 0, 0, 1),
+    0 0 14px rgba(0, 0, 0, 0.9);
 }
 
-.hero-reveal-delay-1 {
-  opacity: 0;
-  animation: hero-reveal 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+.contact {
+  position: fixed;
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 14px 36px;
+  border: 1px solid #fff;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-family: monospace;
+  font-size: 14px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  text-decoration: none;
+  backdrop-filter: blur(4px);
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
-.hero-reveal-delay-2 {
-  opacity: 0;
-  animation: hero-reveal 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.55s forwards;
-}
-
-.hero-reveal-delay-3 {
-  opacity: 0;
-  animation: hero-reveal 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-@keyframes fadeIn {
-  0% { opacity: 0; transform: translateY(4px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideIn {
-  0% { opacity: 0; transform: translateY(-8px) scale(0.98); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes feedSlideIn {
-  0% { opacity: 0; transform: translateY(-6px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes velocity-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-.velocity-shimmer {
-  background-image: linear-gradient(90deg, #f97316, #f43f5e, #fb923c, #f43f5e, #f97316);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;
-  animation: velocity-shimmer 3s ease-in-out infinite;
-}
-
-.building-asset {
-  transition: filter 0.3s ease, opacity 0.3s ease;
-}
-
-.group:hover .building-asset {
-  filter: grayscale(1) sepia(1) hue-rotate(180deg) saturate(6) brightness(0.85) drop-shadow(0 0 20px rgba(80, 160, 255, 0.7));
-  opacity: 0.85;
+.contact:hover {
+  background: #fff;
+  color: #000;
 }
