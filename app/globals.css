@@ -40,9 +40,13 @@ body {
   font-size: clamp(6px, 1vw, 13px);
   line-height: 1.2;
   font-weight: 700;
-  padding: 28px 40px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(3px);
+  padding: 70px 120px;
+  background: radial-gradient(
+    ellipse closest-side,
+    rgba(0, 0, 0, 0.7) 0%,
+    rgba(0, 0, 0, 0.5) 50%,
+    rgba(0, 0, 0, 0) 100%
+  );
   text-shadow:
     0 0 2px rgba(0, 0, 0, 1),
     0 0 6px rgba(0, 0, 0, 1),
