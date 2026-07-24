@@ -26,8 +26,6 @@ const html = String.raw`<!doctype html>
   .brand{display:flex; align-items:center; gap:9px; font-weight:640; font-size:15px; letter-spacing:-.02em; color:var(--ink); text-decoration:none}
   .brand img{width:22px; height:22px; object-fit:contain; display:block}
   .brand .prog{color:var(--muted); font-weight:460}
-  .nav-btn{font-size:14px; font-weight:520; color:var(--ink); background:#fff; border:1px solid var(--line-2); text-decoration:none; padding:9px 15px; border-radius:9px; transition:border-color .15s, background .15s}
-  .nav-btn:hover{border-color:var(--ink); background:var(--wash)}
   @media (max-width:420px){ .brand .prog{display:none} }
   main{max-width:600px; margin:0 auto; padding:56px 24px 90px}
 
@@ -80,13 +78,12 @@ const html = String.raw`<!doctype html>
 <header class="bar">
   <div class="bar-in">
     <a class="brand" href="/"><img src="/monty-logo.png" alt="Monty" width="22" height="22">Monty <span class="prog">Monterey Select</span></a>
-    <a class="nav-btn" href="https://frontier-firms.vercel.app/#calc">Calculate earnings</a>
   </div>
 </header>
 
 <main>
   <h1>Apply to the founding cohort.</h1>
-  <p class="sub">A few quick questions so we don&rsquo;t waste your time or ours. We reply within 48 hours, and applying commits you to nothing.</p>
+  <p class="sub">A few quick questions so we don&rsquo;t waste your time or ours. Applying commits you to nothing.</p>
 
   <form id="frm" novalidate>
     <div class="row2">
@@ -144,7 +141,7 @@ const html = String.raw`<!doctype html>
   var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
   var $=function(id){return document.getElementById(id)};
   var frm=$('frm'), verdict=$('verdict'), mailBtn=$('vmail');
-  var ENDPOINT='https://formsubmit.co/ajax/founders@trymonty.ai';
+  var ENDPOINT='/api/apply';
 
   frm.addEventListener('submit',function(e){
     e.preventDefault();
@@ -161,16 +158,16 @@ const html = String.raw`<!doctype html>
     else if(work==='ai'){ ok=false; tag='declined_ai_contaminated'; headline='You’re further ahead than most.';
       body='AI already runs much of your substantive work, which is great for your firm. But this program captures human-led workflows, so those recordings wouldn’t fit what we collect right now. We’ve saved your details for what comes next.'; }
     else { ok=true; tag='qualified'; headline='Thanks, '+firm+'.';
-      body='We’ve got your application and will reply within 48 hours with next steps and your 60-day pilot terms.'
+      body='We’ve got your application and will be in touch with next steps and your 60-day pilot terms.'
         + (work==='assist' ? ' One thing we’ll confirm on the call: that your people still drive the judgment on the work we’d record.' : ''); }
 
     var subject='Monterey Select — '+tag+' — '+firm;
-    var payload={ _subject:subject, _template:'table', _captcha:'false',
-      Firm:firm, Name:name, Email:email, Phone:phone, Practice:mix, Work_process:work, Software:tools, Screen:tag };
+    var payload={ subject:subject,
+      firm:firm, name:name, email:email, phone:phone, practice:mix, work:work, software:tools, screen:tag };
 
     mailBtn.style.display='none';
     fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload)})
-      .then(function(){ verdict.classList.add('sent'); })
+      .then(function(r){ if(!r.ok) throw new Error('send failed'); verdict.classList.add('sent'); })
       .catch(function(){
         var lines=['Firm: '+firm,'Contact: '+name+' <'+email+'>','Phone: '+phone,'Practice: '+mix,'Work process: '+work,'Software: '+tools,'Screen: '+tag];
         mailBtn.href='mailto:founders@trymonty.ai?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(lines.join('\n'));
