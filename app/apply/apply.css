@@ -1,0 +1,307 @@
+/* Monterey Select application form — visual system mirrored from OpenAI's form page. */
+.apply-root {
+  --ink: #0d0d0d;
+  --ink-60: rgba(13, 13, 13, 0.6);
+  --ink-44: rgba(13, 13, 13, 0.44);
+  --ink-12: rgba(13, 13, 13, 0.12);
+  --ink-4: rgba(13, 13, 13, 0.04);
+  --accent: #0e7a54;
+  --accent-2: #109063;
+  --accent-ink: #0a5c3f;
+
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow-y: auto;
+  background: #fff;
+  color: var(--ink);
+  font-family: "OpenAI Sans", system-ui, -apple-system, "Segoe UI", Helvetica,
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- Header ---------- */
+.apply-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  height: 68px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--ink-12);
+}
+
+/* 640px column + main's 24px gutters, so the brand's left edge
+   lines up exactly with the form column at every width. */
+.apply-header-in {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  max-width: 688px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.apply-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.apply-brand img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  display: block;
+}
+
+.apply-wordmark {
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Main ---------- */
+.apply-main {
+  max-width: 1216px;
+  margin: 0 auto;
+  padding: 40px 24px 96px;
+}
+
+.apply-title {
+  margin: 0 0 16px;
+  font-size: clamp(30px, 3.6vw, 44px);
+  font-weight: 620;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.apply-col {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.apply-intro {
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink-60);
+  max-width: 52ch;
+  margin-bottom: 36px;
+}
+
+/* ---------- Form ---------- */
+.apply-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 560px) {
+  .row2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field > label {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.field .req {
+  color: var(--ink-44);
+}
+
+.control {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--ink-12);
+  border-radius: 8px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.control:hover {
+  border-color: var(--ink-44);
+}
+
+.control:focus {
+  border-color: var(--ink-44);
+  box-shadow: 0 0 0 4px var(--ink-12);
+}
+
+input.control {
+  height: 46px;
+  padding: 0 14px;
+}
+
+select.control {
+  height: 46px;
+  padding: 0 40px 0 14px;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%230d0d0d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+
+select.control:invalid {
+  color: var(--ink-44);
+}
+
+.control::placeholder {
+  color: var(--ink-44);
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 17px 20px;
+  margin-top: 4px;
+  border: none;
+  border-radius: 11px;
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: opacity 0.12s ease, transform 0.1s ease;
+}
+
+.btn-submit:hover {
+  opacity: 0.9;
+}
+
+.btn-submit:active {
+  transform: translateY(1px);
+}
+
+.btn-submit:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--ink-12);
+}
+
+/* ---------- Verdict ---------- */
+.verdict {
+  animation: rise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.vcheck {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--accent);
+  position: relative;
+  margin: 0 0 18px;
+  animation: pop 0.42s cubic-bezier(0.2, 0.8, 0.3, 1.25) both;
+}
+
+.vcheck::after {
+  content: "";
+  position: absolute;
+  left: 19px;
+  top: 13px;
+  width: 10px;
+  height: 19px;
+  border: solid #fff;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.verdict .vt {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  margin: 0 0 12px;
+}
+
+.verdict.ok .vt {
+  color: var(--accent-ink);
+}
+
+.verdict p {
+  color: var(--ink-60);
+  font-size: 15.5px;
+  line-height: 1.55;
+  margin: 0 0 24px;
+}
+
+.mailbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 11px;
+  padding: 14px 22px;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.mailbtn:hover {
+  background: var(--accent-2);
+}
+
+.restart {
+  display: block;
+  margin-top: 18px;
+  background: none;
+  border: none;
+  color: var(--ink-44);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .apply-root * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
