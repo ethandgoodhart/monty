@@ -78,7 +78,7 @@ export default function SpeechPage() {
           <div className="yp-stats4">
             <Stat label="Sample size" value="1" unit="hour" />
             <Stat label="Sample rate" value="48" unit="kHz" />
-            <Stat label="Median overlap" value={(s.overlap_p50 * 100).toFixed(1)} unit="%" />
+            <Stat label="Max overlap" value={(s.overlap_range[1] * 100).toFixed(1)} unit="%" />
             <Stat label="Speakers" value={String(s.speakers)} unit="unique" />
           </div>
 
