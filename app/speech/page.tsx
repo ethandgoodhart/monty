@@ -23,7 +23,6 @@ const CONTACT = "mailto:founders@trymonty.ai?subject=Monterey-100K%20access";
 const SECTIONS: [string, string][] = [
   ["use", "Intended use"],
   ["description", "Data description"],
-  ["audio", "Audio metrics"],
   ["dynamics", "Conversational dynamics"],
   ["collection", "Collection method"],
   ["metadata", "Metadata"],
@@ -32,13 +31,10 @@ const SECTIONS: [string, string][] = [
 
 const s = data.summary;
 const D = data.dist;
-const T = data.tracks;
 const n1 = (x: number) =>
   Math.abs(x) >= 100 ? Math.round(x).toLocaleString() : String(Number(x.toFixed(Math.abs(x) < 10 ? 2 : 1)));
 
 export default function SpeechPage() {
-  const snr = [...T].sort((a, b) => b.snr_db - a.snr_db);
-  const snrs = T.map((t) => t.snr_db);
 
   return (
     <div className={`yp ${sans.variable} ${mono.variable} ${serif.variable}`} id="yp-root">
@@ -140,27 +136,8 @@ export default function SpeechPage() {
             </div>
           </section>
 
-          <section id="audio" className="yp-sec">
-            <Head n="03">Audio metrics</Head>
-            <h4>Signal</h4>
-            <div className="yp-card">
-              <CardHead title="Signal-to-noise by track" tip="Speech level (95th percentile of 50 ms frames inside the speaker's own words) minus the noise floor (10th percentile of all frames)." />
-              <div className="yp-rows">
-                <div className="yp-rows-h"><span>Track</span><span /><span>SNR</span></div>
-                {snr.map((t) => (
-                  <div className="yp-rowbar" key={t.conv + t.spk}>
-                    <span className="yp-mono">{t.conv.slice(-4)} · {t.spk}</span>
-                    <span className="yp-track"><i style={{ width: `${Math.min(100, (t.snr_db / 90) * 100)}%` }} /></span>
-                    <span className="yp-num">{t.snr_db.toFixed(0)} dB</span>
-                  </div>
-                ))}
-              </div>
-              <Pcts d={{ p5: pctl(snrs, 5), p50: pctl(snrs, 50), p95: pctl(snrs, 95) }} unit="dB" />
-            </div>
-          </section>
-
           <section id="dynamics" className="yp-sec">
-            <Head n="04">Conversational dynamics</Head>
+            <Head n="03">Conversational dynamics</Head>
             <div className="yp-grid2">
               <Hist title="Overlap" d={D.overlap_pct} unit="% of voiced time" tip="Per one-minute window: share of voiced time in which both speakers are active (Silero VAD per track, bleed-gated)." />
               <Hist title="Turn-taking gap" d={D.gap_ms} unit="ms" tip={`Silence between one speaker stopping and the other starting, for floor transfers with a gap. ${Math.round(s.fto_overlapping_frac * 100)}% of transfers start in overlap and are not counted here.`} />
@@ -171,7 +148,7 @@ export default function SpeechPage() {
           </section>
 
           <section id="collection" className="yp-sec">
-            <Head n="05">Collection method</Head>
+            <Head n="04">Collection method</Head>
             <p>
               Participants join remotely from their own devices and talk through a lightly prompted session, much like a
               call. Each microphone is recorded separately and aligned on a shared timeline. We keep the room character
@@ -199,12 +176,12 @@ export default function SpeechPage() {
           </section>
 
           <section id="metadata" className="yp-sec">
-            <Head n="06">Metadata</Head>
+            <Head n="05">Metadata</Head>
             <Schema />
           </section>
 
           <section id="access" className="yp-sec">
-            <Head n="07">Access</Head>
+            <Head n="06">Access</Head>
             <div className="yp-steps">
               <div><span>01</span><h3>Request</h3><p>Tell us about your model and the hours, speakers and conditions you need.</p></div>
               <div><span>02</span><h3>Review</h3><p>We share full-length samples and agree on scope, exclusivity and licensing.</p></div>
@@ -226,12 +203,6 @@ export default function SpeechPage() {
       </footer>
     </div>
   );
-}
-
-function pctl(v: number[], q: number) {
-  const a = [...v].sort((x, y) => x - y);
-  const i = (q / 100) * (a.length - 1), lo = Math.floor(i), hi = Math.ceil(i);
-  return a[lo] + (a[hi] - a[lo]) * (i - lo);
 }
 
 function Stat({ label, value, unit }: { label: string; value: string; unit: string }) {
