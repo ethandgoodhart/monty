@@ -90,9 +90,9 @@ const vertexShader = /* glsl */ `
     // uBall is in css px with y down; the ortho camera has y up.
     vec2 sp = vec2(b.x + p.x * b.z, b.y - p.y * b.z);
     // Dots near the pointer ease aside (uMouse.z fades the effect in and out).
-    // Lens-like: displacement grows from zero at the pointer, so no hole opens up (max ~9 px).
+    // Lens-like: displacement grows from zero at the pointer, so no hole opens up (max ~6 px).
     vec2 d = sp - uMouse.xy;
-    sp += d * exp(-dot(d, d) / 6400.0) * 0.26 * uMouse.z * isMain;
+    sp += d * exp(-dot(d, d) / 6400.0) * 0.16 * uMouse.z * isMain;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(sp.x, -sp.y, p.z * b.z, 1.0);
 
     float near = q.z * 0.5 + 0.5;
@@ -232,12 +232,12 @@ export function ScaleCloud() {
         uniforms.uTime.value += dt;
         if (started) uniforms.uIntro.value = Math.min(3, uniforms.uIntro.value + dt * 1.1);
         const b = uniforms.uBall.value[3];
-        const k = 1 - Math.exp(-dt * 3);
+        const k = 1 - Math.exp(-dt * 1.2);
         const tx = ptr.x < -9000 ? 0 : Math.max(-1, Math.min(1, (ptr.x - b.x) / (b.z * 2.5)));
         const ty = ptr.y < -9000 ? 0 : Math.max(-1, Math.min(1, (ptr.y - b.y) / (b.z * 2.5)));
-        tilt.x += (tx * 0.35 - tilt.x) * k;
-        tilt.y += (ty * 0.25 - tilt.y) * k;
-        push += ((ptr.in ? 1 : 0) - push) * (1 - Math.exp(-dt * 4));
+        tilt.x += (tx * 0.2 - tilt.x) * k;
+        tilt.y += (ty * 0.14 - tilt.y) * k;
+        push += ((ptr.in ? 1 : 0) - push) * (1 - Math.exp(-dt * 1.5));
         uniforms.uTilt.value.set(tilt.x, tilt.y);
         uniforms.uMouse.value.set(ptr.x, ptr.y, push);
       }
