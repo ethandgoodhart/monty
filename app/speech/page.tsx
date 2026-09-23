@@ -60,7 +60,7 @@ export default function SpeechPage() {
                   <a className="yp-btn" href={HF_URL}>Download on HuggingFace <span aria-hidden="true">↗</span></a>
                 </div>
               </div>
-              <p className="yp-sub">Unscripted multilingual conversations, every speaker on their own 48 kHz track, scaling to 100,000+ hours</p>
+              <p className="yp-sub">Building the world's largest 48 kHz channel-separated conversation dataset: 100,000+ hours, multilingual and unscripted</p>
             </div>
             <div className="yp-hero-art">
               <Player clips={data.clips} />
@@ -68,9 +68,9 @@ export default function SpeechPage() {
           </section>
 
           <div className="yp-stats4">
+            <Stat label="Sample size" value="1" unit="hour" />
             <Stat label="Sample rate" value="48" unit="kHz" />
             <Stat label="Median overlap" value={(s.overlap_p50 * 100).toFixed(1)} unit="%" />
-            <Stat label="Hours" value="1" unit="hour" />
             <Stat label="Speakers" value={String(s.speakers)} unit="unique" />
           </div>
 
