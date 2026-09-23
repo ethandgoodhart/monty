@@ -8,7 +8,7 @@ const SETS = [
   { name: "Switchboard", hours: 260, rate: "8 kHz" },
   { name: "Fisher English", hours: 1960, rate: "8 kHz" },
   { name: "Seamless Interaction", hours: 4000, rate: "48 kHz" },
-  { name: "Monterey-100K", hours: 100000, rate: "48 kHz" },
+  { name: "Monterey-100K", hours: 100000, rate: "48 kHz · target" },
 ];
 const CBRT = SETS.map((s) => Math.cbrt(s.hours));
 
@@ -36,19 +36,14 @@ function layout(w: number): Layout {
     });
     return { h: base + 104, balls, base: [base, base, base, base] };
   }
-  const k = Math.min(w * 0.42, 190) / CBRT[3];
+  // Each reference gets a third of the width, so its label never collides with a neighbour.
+  const k = Math.min(w * 0.38, 190) / CBRT[3];
   const r = CBRT.map((c) => c * k);
-  const gap = 36;
-  const rowW = 2 * (r[0] + r[1] + r[2]) + gap * 2;
   const top = 16 + 2 * r[2];
-  const big = top + 108 + 2 * r[3];
-  let x = (w - rowW) / 2;
-  const balls = r.map((ri, i) => {
-    if (i === 3) return { x: w / 2, y: big - ri, r: ri };
-    const b = { x: x + ri, y: top - ri, r: ri };
-    x += 2 * ri + gap;
-    return b;
-  });
+  const big = top + 88 + 2 * r[3];
+  const balls = r.map((ri, i) =>
+    i === 3 ? { x: w / 2, y: big - ri, r: ri } : { x: (w * (2 * i + 1)) / 6, y: top - ri, r: ri },
+  );
   return { h: big + 100, balls, base: [top, top, top, big] };
 }
 
@@ -239,7 +234,7 @@ export function ScaleCloud() {
 
   return (
     <div ref={hostRef} className="scl" role="img"
-      aria-label="Point clouds with one dot per hour: Switchboard 260 hours, Fisher English 1,960 hours, Seamless Interaction 4,000 hours, Monterey-100K 100,000 hours.">
+      aria-label="Point clouds with one dot per hour: Switchboard 260 hours, Fisher English 1,960 hours, Seamless Interaction 4,000 hours, Monterey-100K 100,000 hours (target).">
       {lay && <span className="scl-base" style={{ top: lay.base[3] }} />}
       {lay && lay.base[0] !== lay.base[3] && <span className="scl-base" style={{ top: lay.base[0] }} />}
       {lay &&

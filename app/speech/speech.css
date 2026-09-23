@@ -170,6 +170,41 @@
 }
 
 /* ---------- Hero ---------- */
+.yp-sm-only {
+  display: none;
+}
+/* Release status: the dataset is still being collected. */
+.yp-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  margin: 0 0 18px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  font-family: var(--f-mono), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.yp-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: yp-pulse 2s ease-in-out infinite;
+}
+@keyframes yp-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yp-status i {
+    animation: none;
+  }
+}
 .yp-hero-row {
   display: flex;
   flex-wrap: wrap;
@@ -404,11 +439,37 @@
 .scl {
   position: relative;
   z-index: 2;
-  height: calc(224px + min(112.73cqw, 510px));
+  height: calc(204px + min(101.98cqw, 510px));
 }
 @container (min-width: 720px) {
   .scl {
     height: calc(128px + min(46.88cqw, 500px));
+  }
+}
+/* Narrow: references sit in equal thirds; hours lead so a wrapped name can't knock them out of line. */
+@container (max-width: 719.98px) {
+  .scl .scl-lbl {
+    width: 32cqw;
+    margin-left: -16cqw;
+    font-size: 8.5px;
+    letter-spacing: 0.08em;
+    line-height: 1.45;
+  }
+  .scl .scl-lbl span {
+    order: -1;
+    margin-bottom: 4px;
+    font-size: 20px;
+    line-height: 1.1;
+  }
+  .scl .scl-lbl em {
+    color: var(--ink-3);
+  }
+  .scl .scl-lbl.is-main {
+    width: 240px;
+    margin-left: -120px;
+  }
+  .scl .scl-lbl.is-main span {
+    font-size: 28px;
   }
 }
 .scl canvas {
@@ -829,19 +890,46 @@
   .yp-layout {
     padding-top: 28px;
   }
+  /* Title, then the one-line pitch, then both actions side by side. */
+  .yp-hero {
+    display: flex;
+    flex-direction: column;
+  }
+  .yp-hero-row {
+    display: contents;
+  }
   .yp-hero h1 {
-    font-size: 44px;
+    font-size: 48px;
   }
   .yp-sub {
+    order: 1;
+    margin-top: 12px;
     font-size: 15px;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+  .yp-hero-btns {
+    order: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 24px;
+  }
+  .yp-lg-only {
+    display: none;
+  }
+  .yp-sm-only {
+    display: inline;
   }
   .yp-hero-art {
     margin-top: 36px;
   }
-  .yp-hero-btns,
   .yp-hero-btns .yp-btn {
-    width: 100%;
     justify-content: space-between;
+    gap: 8px;
+    padding: 14px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
   }
   .pl {
     padding: 16px 14px;
@@ -888,22 +976,6 @@
   }
   .yp-hist {
     height: 140px;
-  }
-  .scl-lbl {
-    width: 88px;
-    margin-left: -44px;
-    font-size: 8.5px;
-    letter-spacing: 0.08em;
-  }
-  .scl-lbl span {
-    font-size: 18px;
-  }
-  .scl-lbl.is-main {
-    width: 200px;
-    margin-left: -100px;
-  }
-  .scl-lbl.is-main span {
-    font-size: 26px;
   }
 }
 
@@ -1006,4 +1078,10 @@
 }
 .sc-nest {
   padding-left: 16px;
+}
+
+@media (max-width: 350px) {
+  .yp-hero-btns {
+    grid-template-columns: 1fr;
+  }
 }

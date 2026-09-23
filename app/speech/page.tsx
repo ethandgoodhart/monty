@@ -52,11 +52,12 @@ export default function SpeechPage() {
       <div className="yp-layout">
         <main className="yp-main">
           <section className="yp-hero">
+            <p className="yp-status"><i aria-hidden="true" />In dev</p>
             <div className="yp-hero-row">
               <h1>Monterey-100K</h1>
               <div className="yp-hero-btns">
                 <a className="yp-btn yp-btn-dark" href={CONTACT}>Request access <Arrow /></a>
-                <a className="yp-btn" href={HF_URL}>Download on HuggingFace <span aria-hidden="true">↗</span></a>
+                <a className="yp-btn" href={HF_URL}><span>Sample on <span className="yp-lg-only">HuggingFace</span><span className="yp-sm-only">HF</span></span> <span aria-hidden="true">↗</span></a>
               </div>
             </div>
             <p className="yp-sub">The world&rsquo;s largest multilingual 48 kHz channel-separated natural conversation dataset</p>
