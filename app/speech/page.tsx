@@ -60,7 +60,7 @@ export default function SpeechPage() {
                   <a className="yp-btn" href={HF_URL}>Download on HuggingFace <span aria-hidden="true">↗</span></a>
                 </div>
               </div>
-              <p className="yp-sub">The world's first 100,000+ hour multilingual 48 kHz channel-separated natural conversation dataset</p>
+              <p className="yp-sub">The world's largest multilingual 48 kHz channel-separated natural conversation dataset</p>
             </div>
             <div className="yp-hero-art">
               <Player clips={data.clips} />

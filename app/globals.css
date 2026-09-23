@@ -100,6 +100,33 @@ body {
   animation: rise 1.4s 1.2s both cubic-bezier(0.2, 0.7, 0.1, 1);
 }
 
+.hero-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.sublink {
+  color: var(--fg-dim);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-decoration-color: rgba(244, 241, 234, 0.35);
+  text-underline-offset: 4px;
+  transition: color 0.25s ease, text-decoration-color 0.25s ease;
+  animation: rise 1s 1.8s both ease-out;
+}
+
+@media (hover: hover) {
+  .sublink:hover {
+    color: var(--fg);
+    text-decoration-color: var(--fg);
+  }
+}
+
 .cta {
   flex: none;
   display: inline-flex;
@@ -158,6 +185,14 @@ body {
     gap: 22px;
   }
 
+  .hero-side {
+    align-items: stretch;
+  }
+
+  .sublink {
+    align-self: flex-start;
+  }
+
   .cta {
     justify-content: space-between;
   }
@@ -166,6 +201,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .nav,
   .wordmark,
+  .sublink,
   .cta {
     animation: none;
   }
