@@ -197,8 +197,12 @@
 }
 .yp-hero-art {
   margin-top: 48px;
-  padding: 48px;
-  background: url("/speech/coast.jpg") center 40% / cover no-repeat;
+  padding: 56px;
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  background-image: radial-gradient(rgba(20, 19, 18, 0.16) 1px, transparent 1.3px);
+  background-size: 14px 14px;
+  background-position: 7px 7px;
 }
 
 /* ---------- Player ---------- */
@@ -206,9 +210,9 @@
   position: relative;
   padding: 24px 24px 22px;
   border-radius: 0;
-  background: var(--card);
-  box-shadow: 0 1px 2px rgba(38, 35, 35, 0.08), 0 8px 0 -4px rgba(239, 235, 226, 0.85),
-    0 16px 0 -8px rgba(239, 235, 226, 0.6), 0 24px 40px -16px rgba(38, 35, 35, 0.35);
+  border: 1px solid var(--line);
+  background: #fbfaf6;
+  box-shadow: 0 1px 2px rgba(20, 19, 18, 0.04), 0 16px 40px -20px rgba(20, 19, 18, 0.22);
 }
 .pl-top {
   display: flex;
@@ -335,7 +339,7 @@
   padding: 10px 9px 4px;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--card-2);
+  background: var(--bg);
   transition: opacity 0.2s ease;
 }
 .pl-lane.is-muted {
