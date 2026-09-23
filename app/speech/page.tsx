@@ -13,7 +13,7 @@ const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variabl
 export const metadata: Metadata = {
   title: "Monterey-100K · Monterey AI",
   description:
-    "Channel-separated English two-speaker conversations: one isolated 48 kHz track per speaker, human-reviewed, loudness-normalized.",
+    "Channel-separated multilingual two-speaker conversations: one isolated 48 kHz track per speaker, human-reviewed, loudness-normalized.",
 };
 
 const HF_URL = "#access"; // TODO: Hugging Face dataset URL
@@ -60,7 +60,7 @@ export default function SpeechPage() {
                   <a className="yp-btn" href={HF_URL}>Download on HuggingFace <span aria-hidden="true">↗</span></a>
                 </div>
               </div>
-              <p className="yp-sub">Channel-separated English natural two-speaker conversations</p>
+              <p className="yp-sub">Channel-separated multilingual natural two-speaker conversations</p>
               <a className="yp-under" href="#access">Available for commercial model training</a>
             </div>
             <div className="yp-hero-art">
@@ -78,7 +78,7 @@ export default function SpeechPage() {
           <section id="description" className="yp-sec">
             <h2>Data description</h2>
             <p>
-              Monterey-100K is a corpus of unscripted two-speaker English conversation, recorded full-duplex. Every
+              Monterey-100K is a corpus of unscripted, multilingual two-speaker conversation, recorded full-duplex. Every
               participant is captured on their own microphone and delivered as a separate, sample-aligned 48 kHz track.
               Nothing is mixed down, diarized or re-synthesized, so overlap, backchannels, laughter and fast hand-offs
               are all preserved on independent signals.
@@ -102,7 +102,7 @@ export default function SpeechPage() {
               <Row k="Sample rate"><code>48 kHz</code></Row>
               <Row k="Bit depth"><code>16-bit PCM</code></Row>
               <Row k="Loudness"><code>−23 LUFS</code> speech per track <small>≤ −1 dBTP, no compression</small></Row>
-              <Row k="Languages">English (en)</Row>
+              <Row k="Languages">Multilingual <small>(preview sample: English)</small></Row>
               <Row k="Metadata format"><code>.md</code> <code>.json</code> <small>UTF-8</small></Row>
               <Row k="Transcription type">ASR, word-level with timings</Row>
               <Row k="Review">Human, every conversation <small>edits logged against source time</small></Row>
