@@ -3,6 +3,7 @@ import { IBM_Plex_Mono, Inter } from "next/font/google";
 import Link from "next/link";
 import data from "./data.json";
 import { Player } from "./player";
+import { Schema } from "./schema";
 import { Toc } from "./toc";
 import "./speech.css";
 
@@ -22,9 +23,8 @@ const SECTIONS: [string, string][] = [
   ["use", "Intended use"],
   ["audio", "Audio metrics"],
   ["dynamics", "Conversational dynamics"],
-  ["conformance", "Conformance"],
   ["collection", "Collection method"],
-  ["format", "Delivery format"],
+  ["metadata", "Metadata"],
   ["access", "Access"],
 ];
 
@@ -33,20 +33,8 @@ const D = data.dist;
 const T = data.tracks;
 const n1 = (x: number) =>
   Math.abs(x) >= 100 ? Math.round(x).toLocaleString() : String(Number(x.toFixed(Math.abs(x) < 10 ? 2 : 1)));
-const share = (ok: number, n: number) => `${((100 * ok) / n).toFixed(ok === n ? 0 : 1)}%`;
 
 export default function SpeechPage() {
-  const checks: [string, string, number, number][] = [
-    ["Track pairs sharing one sample-aligned timeline", "Required", 5, 5],
-    ["Conversations with word-level transcripts", "Both speakers", 5, 5],
-    ["Conversations reviewed by a person before delivery", "Every flag decided", 5, 5],
-    ["Tracks with zero clipped samples", "No samples at full scale", T.filter((t) => t.clip_frac === 0).length, T.length],
-    ["Tracks at target speech loudness", "−23 ± 0.5 LUFS (BS.1770)", T.filter((t) => Math.abs(t.speech_lufs + 23) <= 0.5).length, T.length],
-    ["Tracks within the true-peak ceiling", "≤ −1.0 dBTP", T.filter((t) => t.true_peak_dbtp <= -1.0).length, T.length],
-    ["Tracks above telephone bandwidth", "Bandwidth at least 6 kHz", T.filter((t) => t.bandwidth_khz >= 6).length, T.length],
-    ["Tracks with full-band audio", "Bandwidth at least 15 kHz", T.filter((t) => t.bandwidth_khz >= 15).length, T.length],
-    ["Tracks with low cross-talk", "Other voice ≤ −20 dB on the mic", T.filter((t) => t.leak_db <= -20).length, T.length],
-  ];
   const snr = [...T].sort((a, b) => b.snr_db - a.snr_db);
   const snrs = T.map((t) => t.snr_db);
 
@@ -159,7 +147,6 @@ export default function SpeechPage() {
               </div>
               <Pcts d={{ p5: pctl(snrs, 5), p50: pctl(snrs, 50), p95: pctl(snrs, 95) }} unit="dB" />
             </div>
-            <Hist title="Effective bandwidth" d={D.bandwidth_khz} unit="kHz" wide tip="Highest frequency within 60 dB of the long-term spectrum peak, per track and one-minute window. 24 kHz is the Nyquist limit at 48 kHz." />
           </section>
 
           <section id="dynamics" className="yp-sec">
@@ -171,20 +158,6 @@ export default function SpeechPage() {
               <Hist title="Speaking rate" d={D.wpm} unit="words/min" tip="Per speaker and one-minute window: ASR words divided by that speaker's voiced time (windows with at least 10 s of speech)." />
             </div>
             <Hist title="Turns per minute" d={D.turns_per_min} unit="turns/min" wide tip="Per one-minute window: floor transfers between speakers (utterances of at least 0.6 s)." />
-          </section>
-
-          <section id="conformance" className="yp-sec">
-            <h2 className="yp-h2-sm">Conformance</h2>
-            <div className="yp-table yp-table-3">
-              <div className="yp-tr yp-th"><span>Check</span><span>Threshold</span><span>Pass</span></div>
-              {checks.map(([c, th, ok, n]) => (
-                <div className="yp-tr" key={c}>
-                  <span>{c}</span>
-                  <span className="yp-dim">{th}</span>
-                  <span className="yp-num">{share(ok, n)}</span>
-                </div>
-              ))}
-            </div>
           </section>
 
           <section id="collection" className="yp-sec">
@@ -215,25 +188,9 @@ export default function SpeechPage() {
             </div>
           </section>
 
-          <section id="format" className="yp-sec">
-            <h2>Delivery format</h2>
-            <p>One folder per conversation. Every file in a folder shares one timeline: sample <em>n</em> is the same moment in each file.</p>
-            <pre className="yp-code">{`monterey-100k/
-├─ edits.json                  # kept and removed ranges, per-track gains
-└─ conversations/
-   └─ conv_20260922_1906/
-      ├─ spkA.wav              # speaker A, mono, 48 kHz / 16-bit
-      ├─ spkB.wav              # speaker B, mono, 48 kHz / 16-bit
-      ├─ stereo_L-A_R-B.wav    # A left, B right
-      └─ INFO.md               # speakers, topics, measurements, edits, transcript`}</pre>
-            <pre className="yp-code">{`"levels": {
-  "target_speech_lufs": -23.0,
-  "A": { "speech_lufs_before": -29.6, "gain_db": 6.64, "true_peak_dbtp": -1.1 }
-},
-"measured": {
-  "A": { "snr_est_db": 39.4, "bw_60dB_hz": 20074, "speech_sec": 403.5 },
-  "bleed": { "leak_into_A_mic_rel_A_speech_db": -25.3 }
-}`}</pre>
+          <section id="metadata" className="yp-sec">
+            <h2>Metadata</h2>
+            <Schema />
           </section>
 
           <section id="access" className="yp-sec">

@@ -790,3 +790,104 @@
     height: 140px;
   }
 }
+
+/* Metadata schema card (dark, collapsible tree). */
+.sc {
+  overflow: hidden;
+  border: 1px solid #27272a;
+  border-radius: 3px;
+  background: #0c0c0e;
+  color: #e7e5e0;
+}
+.sc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 6px 16px;
+  border-bottom: 1px solid #27272a;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: #9a978f;
+}
+.sc-head button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+}
+.sc-head button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+.sc-head svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sc-body {
+  overflow-x: auto;
+  padding: 12px 0;
+  font-family: var(--f-mono), monospace;
+  font-size: 13px;
+  line-height: 24px;
+}
+.sc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding-right: 16px;
+}
+.sc-row > i,
+.sc-row > svg {
+  flex: none;
+  width: 8px;
+  height: 8px;
+}
+.sc-row > svg {
+  fill: #9a978f;
+  transition: transform 0.15s;
+}
+.sc-det > summary {
+  list-style: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.sc-det > summary::-webkit-details-marker {
+  display: none;
+}
+.sc-det > summary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.sc-det[open] > summary > svg {
+  transform: rotate(90deg);
+}
+.sc-root {
+  color: #8fb0ff;
+}
+.sc-desc {
+  font-family: var(--f-sans), system-ui, sans-serif;
+  color: #9a978f;
+}
+.sc-kids {
+  margin: 2px 0 8px;
+  padding-left: 12px;
+  border-left: 1px solid #27272a;
+}
+.sc-field {
+  white-space: pre-wrap;
+}
+.sc-nest {
+  padding-left: 16px;
+}
