@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Inter } from "next/font/google";
+import { Geist_Mono, Inter, Instrument_Serif } from "next/font/google";
 import Link from "next/link";
 import data from "./data.json";
 import { Player } from "./player";
+import { ScaleCloud } from "./scale";
 import { Schema } from "./schema";
 import { Toc } from "./toc";
 import "./speech.css";
 
 const sans = Inter({ subsets: ["latin"], variable: "--f-sans" });
-const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--f-mono" });
+const mono = Geist_Mono({ subsets: ["latin"], variable: "--f-mono" });
+const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", variable: "--f-serif" });
 
 export const metadata: Metadata = {
   title: "Monterey-100K",
@@ -39,43 +41,68 @@ export default function SpeechPage() {
   const snrs = T.map((t) => t.snr_db);
 
   return (
-    <div className={`yp ${sans.variable} ${mono.variable}`} id="yp-root">
+    <div className={`yp ${sans.variable} ${mono.variable} ${serif.variable}`} id="yp-root">
       <header className="yp-nav">
         <Link href="/" className="yp-logo" aria-label="Monterey AI home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/monterey-mark.svg" alt="" />
+          <span>Monterey AI</span>
         </Link>
-        <span className="yp-nav-sep" />
+        <span className="yp-nav-sep">/</span>
         <span className="yp-nav-title">Monterey-100K</span>
+        <a className="yp-nav-cta" href={CONTACT}>Request access <Arrow /></a>
       </header>
+
+      <div className="yp-wide">
+        <section className="yp-hero">
+          <div className="yp-eyebrow">
+            <span>Dataset</span>
+            <span>Speech · two-channel conversation</span>
+            <span>Preview v0</span>
+          </div>
+          <h1>Monterey-100K</h1>
+          <div className="yp-hero-foot">
+            <p className="yp-sub">The world&rsquo;s largest multilingual 48 kHz channel-separated natural conversation dataset</p>
+            <div className="yp-hero-btns">
+              <a className="yp-btn yp-btn-dark" href={CONTACT}>Request access <Arrow /></a>
+              <a className="yp-btn" href={HF_URL}>Download on HuggingFace <span aria-hidden="true">↗</span></a>
+            </div>
+          </div>
+        </section>
+
+        <div className="yp-hero-art">
+          <Player clips={data.clips} />
+        </div>
+
+        <div className="yp-stats4">
+          <Stat label="Sample size" value="1" unit="hour" />
+          <Stat label="Sample rate" value="48" unit="kHz" />
+          <Stat label="Median overlap" value={(s.overlap_p50 * 100).toFixed(1)} unit="%" />
+          <Stat label="Speakers" value={String(s.speakers)} unit="unique" />
+        </div>
+
+        <section className="yp-scale" aria-labelledby="scale-h">
+          <div className="yp-scale-top">
+            <div className="yp-eyebrow"><span>Scale</span><span>1 dot = 1 hour</span></div>
+            <h2 id="scale-h">One hundred thousand hours of conversation.</h2>
+            <p>
+              Each dot is one hour of two-channel conversational audio, drawn at the same density in every cloud, so
+              volume tracks hours. Monterey-100K is 25&times; Seamless Interaction and 51&times; Fisher English.
+            </p>
+          </div>
+          <ScaleCloud />
+          <p className="yp-fn">
+            Switchboard-1 Release 2 (LDC97S62), Fisher English Training Parts 1 and 2 (LDC2004S13, LDC2005S13),
+            Seamless Interaction (Meta, 2025; includes 1,300 h of acted role-play). Monterey-100K shows the full
+            corpus; the preview measured on this page is 1 hour.
+          </p>
+        </section>
+      </div>
 
       <div className="yp-layout">
         <main className="yp-main">
-          <section className="yp-hero">
-            <div className="yp-hero-top">
-              <div className="yp-hero-row">
-                <h1>Monterey-100K</h1>
-                <div className="yp-hero-btns">
-                  <a className="yp-btn yp-btn-dark" href={CONTACT}>Request access</a>
-                  <a className="yp-btn" href={HF_URL}>Download on HuggingFace <span aria-hidden="true">↗</span></a>
-                </div>
-              </div>
-              <p className="yp-sub">The world's largest multilingual 48 kHz channel-separated natural conversation dataset</p>
-            </div>
-            <div className="yp-hero-art">
-              <Player clips={data.clips} />
-            </div>
-          </section>
-
-          <div className="yp-stats4">
-            <Stat label="Sample size" value="1" unit="hour" />
-            <Stat label="Sample rate" value="48" unit="kHz" />
-            <Stat label="Median overlap" value={(s.overlap_p50 * 100).toFixed(1)} unit="%" />
-            <Stat label="Speakers" value={String(s.speakers)} unit="unique" />
-          </div>
-
           <section id="description" className="yp-sec">
-            <h2>Data description</h2>
+            <Head n="01">Data description</Head>
             <p>
               Monterey-100K is a corpus of unscripted, multilingual two-speaker conversation, recorded full-duplex. Every
               participant is captured on their own microphone and delivered as a separate, sample-aligned 48 kHz track.
@@ -109,7 +136,7 @@ export default function SpeechPage() {
           </section>
 
           <section id="use" className="yp-sec">
-            <h2>Intended use</h2>
+            <Head n="02">Intended use</Head>
             <div className="yp-uses">
               <div>
                 <svg viewBox="0 0 24 16" className="yp-ico" aria-hidden="true"><rect x="0" y="4" width="24" height="2.4" rx="1.2" fill="#b9b7b0" /><rect x="0" y="9.6" width="24" height="2.4" rx="1.2" fill="#b9b7b0" /><rect x="10.8" y="0" width="2.4" height="16" rx="1.2" fill="var(--accent)" /></svg>
@@ -130,7 +157,7 @@ export default function SpeechPage() {
           </section>
 
           <section id="audio" className="yp-sec">
-            <h2>Audio metrics</h2>
+            <Head n="03">Audio metrics</Head>
             <h4>Signal</h4>
             <div className="yp-card">
               <CardHead title="Signal-to-noise by track" tip="Speech level (95th percentile of 50 ms frames inside the speaker's own words) minus the noise floor (10th percentile of all frames)." />
@@ -149,7 +176,7 @@ export default function SpeechPage() {
           </section>
 
           <section id="dynamics" className="yp-sec">
-            <h2 className="yp-h2-sm">Conversational dynamics</h2>
+            <Head n="04">Conversational dynamics</Head>
             <div className="yp-grid2">
               <Hist title="Overlap" d={D.overlap_pct} unit="% of voiced time" tip="Per one-minute window: share of voiced time in which both speakers are active (Silero VAD per track, bleed-gated)." />
               <Hist title="Turn-taking gap" d={D.gap_ms} unit="ms" tip={`Silence between one speaker stopping and the other starting, for floor transfers with a gap. ${Math.round(s.fto_overlapping_frac * 100)}% of transfers start in overlap and are not counted here.`} />
@@ -160,7 +187,7 @@ export default function SpeechPage() {
           </section>
 
           <section id="collection" className="yp-sec">
-            <h2>Collection method</h2>
+            <Head n="05">Collection method</Head>
             <p>
               Participants join remotely from their own devices and talk through a lightly prompted session, much like a
               call. Each microphone is recorded separately and aligned on a shared timeline. We keep the room character
@@ -188,29 +215,31 @@ export default function SpeechPage() {
           </section>
 
           <section id="metadata" className="yp-sec">
-            <h2>Metadata</h2>
+            <Head n="06">Metadata</Head>
             <Schema />
           </section>
 
           <section id="access" className="yp-sec">
-            <h2>Access</h2>
+            <Head n="07">Access</Head>
             <div className="yp-steps">
               <div><span>01</span><h3>Request</h3><p>Tell us about your model and the hours, speakers and conditions you need.</p></div>
               <div><span>02</span><h3>Review</h3><p>We share full-length samples and agree on scope, exclusivity and licensing.</p></div>
               <div><span>03</span><h3>Delivery</h3><p>WAV or FLAC files and metadata over secure transfer, in the format above.</p></div>
             </div>
-            <a className="yp-btn yp-btn-dark yp-mt" href={CONTACT}>Request access</a>
+            <a className="yp-btn yp-btn-dark yp-mt" href={CONTACT}>Request access <Arrow /></a>
           </section>
 
-          <footer className="yp-foot">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/monterey-mark.svg" alt="" />
-            <span>Monterey AI</span>
-            <a href="mailto:founders@trymonty.ai">founders@trymonty.ai</a>
-          </footer>
         </main>
         <Toc sections={SECTIONS} />
       </div>
+
+      <footer className="yp-foot">
+        <div className="yp-foot-row">
+          <span>Monterey AI · San Francisco, CA</span>
+          <a href="mailto:founders@trymonty.ai">founders@trymonty.ai</a>
+        </div>
+        <Link href="/" className="yp-foot-mark">Monterey</Link>
+      </footer>
     </div>
   );
 }
@@ -227,6 +256,23 @@ function Stat({ label, value, unit }: { label: string; value: string; unit: stri
       <span className="yp-lbl">{label}</span>
       <b>{value}<small>{unit === "%" ? unit : ` ${unit}`}</small></b>
     </div>
+  );
+}
+
+function Head({ n, children }: { n: string; children: React.ReactNode }) {
+  return (
+    <div className="yp-sec-h">
+      <span>{n}</span>
+      <h2>{children}</h2>
+    </div>
+  );
+}
+
+function Arrow() {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+      <path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
   );
 }
 
