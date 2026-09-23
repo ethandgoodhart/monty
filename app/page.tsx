@@ -1,28 +1,36 @@
-const TITLE = [
-  "88b           d88                                                                                    ",
-  "888b         d888                             ,d                                                     ",
-  "88`8b       d8'88                             88                                                     ",
-  "88 `8b     d8' 88   ,adPPYba,   8b,dPPYba,  MM88MMM  ,adPPYba,  8b,dPPYba,   ,adPPYba,  8b       d8  ",
-  "88  `8b   d8'  88  a8\"     \"8a  88P'   `\"8a   88    a8P_____88  88P'   \"Y8  a8P_____88  `8b     d8'  ",
-  "88   `8b d8'   88  8b       d8  88       88   88    8PP\"\"\"\"\"\"\"  88          8PP\"\"\"\"\"\"\"   `8b   d8'   ",
-  "88    `888'    88  \"8a,   ,a8\"  88       88   88,   \"8b,   ,aa  88          \"8b,   ,aa    `8b,d8'    ",
-  "88     `8'     88   `\"YbbdP\"'   88       88   \"Y888  `\"Ybbd8\"'  88           `\"Ybbd8\"'      Y88'     ",
-  "                                                                                            d8'      ",
-  "                                                                                           d8'       ",
-].join("\n");
+import { Geist_Mono, Instrument_Serif } from "next/font/google";
+import Link from "next/link";
+import { PointCloud } from "./point-cloud";
+
+const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif" });
+const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export default function Home() {
   return (
-    <main>
-      <div className="ascii-bg" aria-hidden="true">
-        <video src="/ascii.mp4" autoPlay loop muted playsInline />
-      </div>
-      <h1 className="title">
-        <pre>{TITLE}</pre>
-      </h1>
-      <a className="contact" href="mailto:founders@trymonty.ai">
-        Contact Us
-      </a>
+    <main className={`home ${serif.variable} ${mono.variable}`}>
+      <PointCloud className="cloud" />
+      <div className="shade" aria-hidden="true" />
+
+      <header className="nav">
+        <Link className="brand" href="/">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/monty-logo.png" alt="" width={22} height={22} />
+          <span>Monterey AI</span>
+        </Link>
+        <span className="coords">36.5686° N&nbsp;&nbsp;121.9652° W</span>
+      </header>
+
+      <section className="hero">
+        <h1 className="wordmark">
+          Monterey<em>.</em>
+        </h1>
+        <a className="cta" href="mailto:founders@trymonty.ai">
+          <span>Contact us</span>
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.4" />
+          </svg>
+        </a>
+      </section>
     </main>
   );
 }
