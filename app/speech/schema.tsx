@@ -29,9 +29,9 @@ const TREE: Node = ["conversations/", undefined, [
     ]],
   ]],
   ["conv_20260922_1906/", undefined, [
-    ["spkA.wav", "speaker A's own microphone: mono, 48 kHz, 16-bit PCM"],
-    ["spkB.wav", "speaker B's own microphone: same format"],
-    ["stereo_L-A_R-B.wav", "the same two tracks in one file, A left and B right"],
+    ["spkA.wav | .flac", "speaker A's own microphone: mono, 48 kHz, 16-bit PCM"],
+    ["spkB.wav | .flac", "speaker B's own microphone: same format"],
+    ["stereo_L-A_R-B.wav | .flac", "the same two tracks in one file, A left and B right"],
     ["INFO.md", undefined, [
       ["recorded", "date and time of the session"],
       ["speaker_a | speaker_b", "stable pseudonyms"],
@@ -51,7 +51,7 @@ const TREE: Node = ["conversations/", undefined, [
       ]],
       ["levels", "gain and loudness per track, as in edits.json"],
       ["edits", "removed ranges with reasons, and a source-to-delivered time map"],
-      ["transcript", "automatic, per speaker, timestamped in delivered time; not human-verified"],
+      ["transcript", "automatic, per speaker, timestamped in delivered time"],
     ]],
   ]],
 ]];

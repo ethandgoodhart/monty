@@ -98,13 +98,13 @@ export default function SpeechPage() {
               <div className="yp-tr yp-th"><span>Detail</span><span>Value</span></div>
               <Row k="Speakers per recording">2</Row>
               <Row k="Channels">Dual (one file per speaker), plus a stereo L/R file</Row>
-              <Row k="Audio format"><code>.wav</code></Row>
+              <Row k="Audio format"><code>.wav</code> <code>.flac</code></Row>
               <Row k="Sample rate"><code>48 kHz</code></Row>
               <Row k="Bit depth"><code>16-bit PCM</code></Row>
               <Row k="Loudness"><code>−23 LUFS</code> speech per track <small>≤ −1 dBTP, no compression</small></Row>
               <Row k="Languages">English (en)</Row>
               <Row k="Metadata format"><code>.md</code> <code>.json</code> <small>UTF-8</small></Row>
-              <Row k="Transcription type">ASR, word-level with timings <small>(not human-verified)</small></Row>
+              <Row k="Transcription type">ASR, word-level with timings</Row>
               <Row k="Review">Human, every conversation <small>edits logged against source time</small></Row>
             </div>
           </section>
@@ -198,7 +198,7 @@ export default function SpeechPage() {
             <div className="yp-steps">
               <div><span>01</span><h3>Request</h3><p>Tell us about your model and the hours, speakers and conditions you need.</p></div>
               <div><span>02</span><h3>Review</h3><p>We share full-length samples and agree on scope, exclusivity and licensing.</p></div>
-              <div><span>03</span><h3>Delivery</h3><p>WAV files and metadata over secure transfer, in the format above.</p></div>
+              <div><span>03</span><h3>Delivery</h3><p>WAV or FLAC files and metadata over secure transfer, in the format above.</p></div>
             </div>
             <a className="yp-btn yp-btn-dark yp-mt" href={CONTACT}>Request access</a>
           </section>
