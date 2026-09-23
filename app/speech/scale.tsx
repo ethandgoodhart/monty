@@ -11,10 +11,12 @@ const SETS = [
   { name: "Monterey-100K", hours: 100000, rate: "48 kHz" },
 ];
 const CBRT = SETS.map((s) => Math.cbrt(s.hours));
-const BG = 0xf4f1ea;
 
 type Ball = { x: number; y: number; r: number };
 type Layout = { h: number; balls: Ball[]; base: number[] };
+
+// The intro starts points at up to 1.62x their radius, so the canvas extends past the box by this much.
+const bleed = (l: Layout) => Math.ceil(l.balls[3].r * 0.7);
 
 // Balls sit on a shared baseline; on narrow screens the three references go on a row above Monterey.
 function layout(w: number): Layout {
@@ -96,7 +98,7 @@ const fragmentShader = /* glsl */ `
     if (a < 0.01) discard;
     vec3 ink = vec3(0.09, 0.085, 0.08);
     vec3 blue = vec3(0.0, 0.25, 0.94);
-    gl_FragColor = vec4(mix(ink, blue, vMain), a);
+    gl_FragColor = vec4(mix(ink, blue, vMain) * a, a);
   }
 `;
 
@@ -110,11 +112,11 @@ export function ScaleCloud() {
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: true });
     } catch {
       return;
     }
-    renderer.setClearColor(BG, 1);
+    renderer.setClearColor(0x000000, 0);
     host.prepend(renderer.domElement);
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -156,6 +158,7 @@ export function ScaleCloud() {
       transparent: true,
       depthTest: false,
       depthWrite: false,
+      premultipliedAlpha: true,
     });
     const points = new THREE.Points(geometry, material);
     points.frustumCulled = false;
@@ -168,9 +171,13 @@ export function ScaleCloud() {
       const l = layout(w);
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       renderer.setPixelRatio(dpr);
-      renderer.setSize(w, l.h, false);
-      camera.right = w;
-      camera.bottom = -l.h;
+      const m = bleed(l);
+      renderer.setSize(w + 2 * m, l.h + 2 * m);
+      Object.assign(renderer.domElement.style, { left: `${-m}px`, top: `${-m}px` });
+      camera.left = -m;
+      camera.right = w + m;
+      camera.top = m;
+      camera.bottom = -(l.h + m);
       camera.updateProjectionMatrix();
       l.balls.forEach((b, i) => uniforms.uBall.value[i].set(b.x, b.y, b.r));
       uniforms.uPx.value = dpr;

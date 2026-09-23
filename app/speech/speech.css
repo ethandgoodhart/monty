@@ -404,11 +404,12 @@
 }
 .scl {
   position: relative;
+  z-index: 2;
 }
 .scl canvas {
+  position: absolute;
   display: block;
-  width: 100% !important;
-  height: 100% !important;
+  pointer-events: none;
 }
 .scl-base {
   position: absolute;
