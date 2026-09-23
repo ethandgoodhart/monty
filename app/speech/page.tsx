@@ -15,6 +15,7 @@ export const metadata: Metadata = {
     "Channel-separated English two-speaker conversations: one isolated 48 kHz track per speaker, human-reviewed, loudness-normalized.",
 };
 
+const HF_URL = "#access"; // TODO: Hugging Face dataset URL
 const CONTACT = "mailto:founders@trymonty.ai?subject=Monterey-100K%20access";
 const SECTIONS: [string, string][] = [
   ["description", "Data description"],
@@ -68,7 +69,7 @@ export default function SpeechPage() {
                 <h1>Monterey-100K</h1>
                 <div className="yp-hero-btns">
                   <a className="yp-btn yp-btn-dark" href={CONTACT}>Request access</a>
-                  <a className="yp-btn" href="#access">Licensing <span aria-hidden="true">↗</span></a>
+                  <a className="yp-btn" href={HF_URL}>Download on HuggingFace <span aria-hidden="true">↗</span></a>
                 </div>
               </div>
               <p className="yp-sub">Channel-separated English natural two-speaker conversations</p>
@@ -80,10 +81,10 @@ export default function SpeechPage() {
           </section>
 
           <div className="yp-stats4">
-            <Stat label="Channels" value="2" unit="isolated" />
             <Stat label="Sample rate" value="48" unit="kHz" />
             <Stat label="Median overlap" value={(s.overlap_p50 * 100).toFixed(1)} unit="%" />
-            <Stat label="Median SNR" value={String(Math.round(s.snr_p50))} unit="dB" />
+            <Stat label="Hours" value="1" unit="hour" />
+            <Stat label="Speakers" value={String(s.speakers)} unit="unique" />
           </div>
 
           <section id="description" className="yp-sec">
