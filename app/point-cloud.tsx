@@ -6,6 +6,11 @@ import * as THREE from "three";
 // pointcloud.mp4 packs each frame as color (top half) over Depth Anything 3
 // disparity (bottom half, white = near). It plays forward then reversed so it loops seamlessly.
 const SRC = "/pointcloud.mp4";
+// Fallback for browsers that refuse to autoplay video (iOS Low Power Mode, data saver): the forward
+// half of the clip as a JPEG sequence at 12 fps, ping-ponged in JS.
+const FRAME_COUNT = 119;
+const FRAME_FPS = 12;
+const frameSrc = (i: number) => `/pointcloud-frames/${String(i + 1).padStart(3, "0")}.jpg`;
 const VIDEO_ASPECT = 756 / 392;
 const FOV = 38;
 const CAM_DIST = 3;
@@ -129,6 +134,9 @@ export function PointCloud({ className }: { className?: string }) {
     video.preload = "auto";
     video.setAttribute("playsinline", "");
     video.setAttribute("muted", "");
+    // iOS is more willing to autoplay a video that is actually in the document.
+    video.style.cssText = "position:absolute;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none";
+    host.appendChild(video);
 
     const texture = new THREE.VideoTexture(video);
     texture.minFilter = THREE.LinearFilter;
@@ -140,7 +148,7 @@ export function PointCloud({ className }: { className?: string }) {
     camera.position.set(0, 0, CAM_DIST);
 
     const uniforms = {
-      uTex: { value: texture },
+      uTex: { value: texture as THREE.Texture },
       uPlane: { value: new THREE.Vector2(1, 1) },
       uCell: { value: new THREE.Vector2(0, 0) },
       uTime: { value: 0 },
@@ -263,14 +271,65 @@ export function PointCloud({ className }: { className?: string }) {
     window.addEventListener("pointermove", onPointer, { passive: true });
 
     let started = false;
-    const tryPlay = () => video.play().catch(() => {});
-    const onFirstFrame = () => {
+    let disposed = false;
+    const markStarted = () => {
       started = true;
       host.dataset.ready = "true";
     };
-    video.addEventListener("playing", onFirstFrame, { once: true });
+
+    // Image-sequence fallback, used only when the video can't autoplay.
+    let frames: HTMLImageElement[] | null = null;
+    let frameTexture: THREE.Texture | null = null;
+    let frameClock = 0;
+    let shownFrame = -1;
+    let framesLoaded = 0;
+    const switchToFrames = () => {
+      if (frames || started || disposed) return;
+      window.clearTimeout(watchdog);
+      window.removeEventListener("pointerdown", onGesture);
+      video.removeEventListener("pause", onPause);
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+
+      frameTexture = new THREE.Texture();
+      frameTexture.minFilter = THREE.LinearFilter;
+      frameTexture.magFilter = THREE.LinearFilter;
+      frameTexture.generateMipmaps = false;
+      frames = Array.from({ length: FRAME_COUNT }, (_, i) => {
+        const img = new Image();
+        img.decoding = "async";
+        img.onload = () => {
+          if (disposed) return;
+          framesLoaded++;
+          if (i === 0) {
+            frameTexture!.image = img;
+            frameTexture!.needsUpdate = true;
+            uniforms.uTex.value = frameTexture!;
+            shownFrame = 0;
+            markStarted();
+          }
+        };
+        img.src = frameSrc(i);
+        return img;
+      });
+    };
+
+    const tryPlay = () =>
+      video.play().catch((err: DOMException) => {
+        if (err?.name === "NotAllowedError") switchToFrames();
+      });
+    video.addEventListener("playing", markStarted, { once: true });
+    // Safari may pause a muted autoplay video on its own; if it won't resume, switch to frames.
+    const onPause = () => {
+      if (!started && !frames) tryPlay();
+    };
+    video.addEventListener("pause", onPause);
     tryPlay();
-    // iOS low-power mode can block autoplay; resume on the first touch.
+    // Some browsers neither play nor reject; don't wait forever for a tap.
+    const watchdog = window.setTimeout(() => {
+      if (!started && video.paused) switchToFrames();
+    }, 2500);
     const onGesture = () => tryPlay();
     window.addEventListener("pointerdown", onGesture, { once: true });
 
@@ -282,6 +341,18 @@ export function PointCloud({ className }: { className?: string }) {
       const t = clock.elapsedTime;
       uniforms.uTime.value = t;
       if (started && !reducedMotion) uniforms.uIntro.value = Math.min(2, uniforms.uIntro.value + dt * 0.55);
+
+      // Hold the first frame until the whole sequence is in, then ping-pong through it.
+      if (frames && frameTexture && framesLoaded === FRAME_COUNT && !reducedMotion) {
+        frameClock += dt;
+        const step = Math.floor(frameClock * FRAME_FPS) % (2 * (FRAME_COUNT - 1));
+        const i = step < FRAME_COUNT ? step : 2 * (FRAME_COUNT - 1) - step;
+        if (i !== shownFrame) {
+          shownFrame = i;
+          frameTexture.image = frames[i];
+          frameTexture.needsUpdate = true;
+        }
+      }
 
       const k = 1 - Math.exp(-dt * 2.2);
       eased.x += (pointer.x - eased.x) * k;
@@ -301,14 +372,19 @@ export function PointCloud({ className }: { className?: string }) {
     tick();
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
       window.clearTimeout(resizeTimer);
+      window.clearTimeout(watchdog);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("pointermove", onPointer);
       window.removeEventListener("pointerdown", onGesture);
+      video.removeEventListener("pause", onPause);
       video.pause();
       video.removeAttribute("src");
       video.load();
+      video.remove();
+      frameTexture?.dispose();
       points?.geometry.dispose();
       material.dispose();
       texture.dispose();
