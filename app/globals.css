@@ -67,20 +67,12 @@ body {
 }
 
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   color: var(--fg);
   text-decoration: none;
 }
 
-.brand img {
-  image-rendering: pixelated;
-}
-
-.coords {
+.location {
   color: var(--fg-dim);
-  font-variant-numeric: tabular-nums;
 }
 
 .hero {
@@ -106,11 +98,6 @@ body {
   margin-bottom: -0.06em;
   text-shadow: 0 0 40px rgba(0, 0, 0, 0.35);
   animation: rise 1.4s 1.2s both cubic-bezier(0.2, 0.7, 0.1, 1);
-}
-
-.wordmark em {
-  font-style: italic;
-  color: #7fe3f0;
 }
 
 .cta {
@@ -165,10 +152,6 @@ body {
 }
 
 @media (max-width: 720px) {
-  .coords {
-    display: none;
-  }
-
   .hero {
     flex-direction: column;
     align-items: stretch;

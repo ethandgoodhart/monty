@@ -2,7 +2,7 @@ import { Geist_Mono, Instrument_Serif } from "next/font/google";
 import Link from "next/link";
 import { PointCloud } from "./point-cloud";
 
-const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif" });
+const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", variable: "--font-serif" });
 const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export default function Home() {
@@ -13,16 +13,14 @@ export default function Home() {
 
       <header className="nav">
         <Link className="brand" href="/">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/monty-logo.png" alt="" width={22} height={22} />
-          <span>Monterey AI</span>
+          Monterey AI
         </Link>
-        <span className="coords">36.5686° N&nbsp;&nbsp;121.9652° W</span>
+        <span className="location">San Francisco, CA</span>
       </header>
 
       <section className="hero">
         <h1 className="wordmark">
-          Monterey<em>.</em>
+          Monterey
         </h1>
         <a className="cta" href="mailto:founders@trymonty.ai">
           <span>Contact us</span>
