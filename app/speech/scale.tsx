@@ -18,6 +18,7 @@ type Layout = { h: number; balls: Ball[]; base: number[] };
 // The intro starts points at up to 1.62x their radius, so the canvas extends past the box by this much.
 const bleed = (l: Layout) => Math.ceil(l.balls[3].r * 0.7);
 
+// Keep in sync with the .scl height in speech.css, which reserves this height before the script runs.
 // Balls sit on a shared baseline; on narrow screens the three references go on a row above Monterey.
 function layout(w: number): Layout {
   if (w >= 720) {
@@ -237,7 +238,7 @@ export function ScaleCloud() {
   }, []);
 
   return (
-    <div ref={hostRef} className="scl" style={{ height: lay?.h }} role="img"
+    <div ref={hostRef} className="scl" role="img"
       aria-label="Point clouds with one dot per hour: Switchboard 260 hours, Fisher English 1,960 hours, Seamless Interaction 4,000 hours, Monterey-100K 100,000 hours.">
       {lay && <span className="scl-base" style={{ top: lay.base[3] }} />}
       {lay && lay.base[0] !== lay.base[3] && <span className="scl-base" style={{ top: lay.base[0] }} />}

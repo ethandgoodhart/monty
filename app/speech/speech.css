@@ -401,10 +401,18 @@
 /* ---------- Scale (one dot per hour) ---------- */
 .yp-scale {
   padding-top: 24px;
+  container-type: inline-size;
 }
+/* Same height as layout() in scale.tsx, so nothing below shifts when the chart mounts. */
 .scl {
   position: relative;
   z-index: 2;
+  height: calc(224px + min(112.73cqw, 510px));
+}
+@container (min-width: 720px) {
+  .scl {
+    height: calc(128px + min(46.88cqw, 500px));
+  }
 }
 .scl canvas {
   position: absolute;
