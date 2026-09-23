@@ -61,7 +61,7 @@ export default function SpeechPage() {
                 </div>
               </div>
               <p className="yp-sub">Channel-separated multilingual natural two-speaker conversations</p>
-              <a className="yp-under" href="#access">Available for commercial model training</a>
+              <a className="yp-under" href="#access">Up to 100,000 or more hours</a>
             </div>
             <div className="yp-hero-art">
               <Player clips={data.clips} />
