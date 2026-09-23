@@ -24,7 +24,10 @@ export default function Home() {
         </h1>
         <div className="hero-side">
           <Link className="sublink" href="/speech">
-            Speech dataset
+            <span>Speech</span>
+            <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+              <path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.4" />
+            </svg>
           </Link>
           <a className="cta" href="mailto:founders@trymonty.ai">
             <span>Contact us</span>

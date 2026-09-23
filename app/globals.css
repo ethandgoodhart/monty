@@ -109,21 +109,29 @@ body {
 }
 
 .sublink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--fg-dim);
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  text-decoration: underline;
-  text-decoration-color: rgba(244, 241, 234, 0.35);
-  text-underline-offset: 4px;
-  transition: color 0.25s ease, text-decoration-color 0.25s ease;
+  text-decoration: none;
+  transition: color 0.25s ease;
   animation: rise 1s 1.8s both ease-out;
+}
+
+.sublink svg {
+  transition: transform 0.25s ease;
 }
 
 @media (hover: hover) {
   .sublink:hover {
     color: var(--fg);
-    text-decoration-color: var(--fg);
+  }
+
+  .sublink:hover svg {
+    transform: translateX(3px);
   }
 }
 
