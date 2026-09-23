@@ -11,7 +11,7 @@ const sans = Inter({ subsets: ["latin"], variable: "--f-sans" });
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--f-mono" });
 
 export const metadata: Metadata = {
-  title: "Monterey-100K · Monterey AI",
+  title: "Monterey-100K",
   description:
     "Channel-separated multilingual two-speaker conversations: one isolated 48 kHz track per speaker, human-reviewed, loudness-normalized.",
 };
