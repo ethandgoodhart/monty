@@ -58,6 +58,8 @@ const vertexShader = /* glsl */ `
   uniform float uIntro;
   uniform float uSize;
   uniform float uPx;
+  uniform vec2 uTilt;
+  uniform vec3 uMouse;
   attribute vec3 aLocal;
   attribute float aBall;
   attribute vec3 aRand;
@@ -74,18 +76,29 @@ const vertexShader = /* glsl */ `
     float tc = cos(0.32), ts = sin(0.32);
     q = vec3(q.x, tc * q.y - ts * q.z, ts * q.y + tc * q.z);
 
+    // The Monterey cloud leans toward the pointer.
+    float isMain = step(2.5, aBall);
+    float yw = uTilt.x * isMain, pt = uTilt.y * isMain;
+    q = vec3(cos(yw) * q.x + sin(yw) * q.z, q.y, -sin(yw) * q.x + cos(yw) * q.z);
+    q = vec3(q.x, cos(pt) * q.y - sin(pt) * q.z, sin(pt) * q.y + cos(pt) * q.z);
+
     // Intro: points condense inward from a wide haze.
     float t = clamp((uIntro - aRand.x * 0.7 - aBall * 0.12) / 1.1, 0.0, 1.0);
     float e = 1.0 - pow(1.0 - t, 4.0);
     vec3 p = mix(q * (1.12 + aRand.y * 0.5), q, e);
 
     // uBall is in css px with y down; the ortho camera has y up.
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(b.x + p.x * b.z, -(b.y - p.y * b.z), p.z * b.z, 1.0);
+    vec2 sp = vec2(b.x + p.x * b.z, b.y - p.y * b.z);
+    // Dots near the pointer ease aside (uMouse.z fades the effect in and out).
+    // Lens-like: displacement grows from zero at the pointer, so no hole opens up (max ~9 px).
+    vec2 d = sp - uMouse.xy;
+    sp += d * exp(-dot(d, d) / 6400.0) * 0.26 * uMouse.z * isMain;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(sp.x, -sp.y, p.z * b.z, 1.0);
 
     float near = q.z * 0.5 + 0.5;
     gl_PointSize = uSize * uPx * mix(0.75, 1.3, near) * mix(0.8, 1.15, aRand.z);
     vAlpha = mix(0.22, 0.8, near) * e;
-    vMain = step(2.5, aBall);
+    vMain = isMain;
   }
 `;
 
@@ -151,6 +164,8 @@ export function ScaleCloud() {
       uIntro: { value: reduced ? 3 : 0 },
       uSize: { value: 1.7 },
       uPx: { value: 1 },
+      uTilt: { value: new THREE.Vector2() },
+      uMouse: { value: new THREE.Vector3(-9999, -9999, 0) },
     };
     const material = new THREE.ShaderMaterial({
       uniforms,
@@ -187,6 +202,23 @@ export function ScaleCloud() {
       if (!running) renderer.render(scene, camera);
     };
 
+    // Pointer in chart px; tilt and the push-aside strength are eased toward their targets each frame.
+    const ptr = { x: -9999, y: -9999, in: false };
+    const tilt = { x: 0, y: 0 };
+    let push = 0;
+    const onPointer = (e: PointerEvent) => {
+      const r = host.getBoundingClientRect();
+      ptr.x = e.clientX - r.left;
+      ptr.y = e.clientY - r.top;
+      const b = uniforms.uBall.value[3];
+      ptr.in = Math.hypot(ptr.x - b.x, ptr.y - b.y) < b.z * 1.25;
+    };
+    const onLeave = () => (ptr.in = false);
+    if (!reduced) {
+      window.addEventListener("pointermove", onPointer, { passive: true });
+      document.documentElement.addEventListener("pointerleave", onLeave);
+    }
+
     let running = false;
     let started = reduced;
     let raf = 0;
@@ -199,6 +231,15 @@ export function ScaleCloud() {
       if (!reduced) {
         uniforms.uTime.value += dt;
         if (started) uniforms.uIntro.value = Math.min(3, uniforms.uIntro.value + dt * 1.1);
+        const b = uniforms.uBall.value[3];
+        const k = 1 - Math.exp(-dt * 3);
+        const tx = ptr.x < -9000 ? 0 : Math.max(-1, Math.min(1, (ptr.x - b.x) / (b.z * 2.5)));
+        const ty = ptr.y < -9000 ? 0 : Math.max(-1, Math.min(1, (ptr.y - b.y) / (b.z * 2.5)));
+        tilt.x += (tx * 0.35 - tilt.x) * k;
+        tilt.y += (ty * 0.25 - tilt.y) * k;
+        push += ((ptr.in ? 1 : 0) - push) * (1 - Math.exp(-dt * 4));
+        uniforms.uTilt.value.set(tilt.x, tilt.y);
+        uniforms.uMouse.value.set(ptr.x, ptr.y, push);
       }
       renderer.render(scene, camera);
     };
@@ -230,6 +271,8 @@ export function ScaleCloud() {
       cancelAnimationFrame(raf);
       ro.disconnect();
       io.disconnect();
+      window.removeEventListener("pointermove", onPointer);
+      document.documentElement.removeEventListener("pointerleave", onLeave);
       geometry.dispose();
       material.dispose();
       renderer.dispose();

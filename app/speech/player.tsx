@@ -176,8 +176,6 @@ export function Player({ clips }: { clips: Clip[] }) {
           </div>
           <Wave
             env={k === "A" ? clip.envA : clip.envB}
-            overlaps={clip.overlaps}
-            duration={clip.duration}
             progress={time / clip.duration}
             color={k === "A" ? ACCENT : INK}
             onSeek={seek}
@@ -189,9 +187,9 @@ export function Player({ clips }: { clips: Clip[] }) {
 }
 
 function Wave({
-  env, overlaps, duration, progress, color, onSeek,
+  env, progress, color, onSeek,
 }: {
-  env: number[]; overlaps: number[][]; duration: number; progress: number; color: number[]; onSeek: (f: number) => void;
+  env: number[]; progress: number; color: number[]; onSeek: (f: number) => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [w, setW] = useState(0);
@@ -215,9 +213,6 @@ function Wave({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, H);
     const cy = H / 2, step = 3, bw = 1.4, cols = Math.floor(w / step), per = env.length / cols;
-    // Faint band where both speakers talk at once.
-    ctx.fillStyle = "rgba(0,64,240,0.06)";
-    for (const [s, e] of overlaps) ctx.fillRect((s / duration) * w, 0, Math.max(1, ((e - s) / duration) * w), H);
     for (let c = 0; c < cols; c++) {
       let v = 0;
       for (let i = Math.floor(c * per); i < Math.floor((c + 1) * per) && i < env.length; i++) v = Math.max(v, env[i]);
@@ -226,7 +221,7 @@ function Wave({
       ctx.fillStyle = `rgba(${color[0]},${color[1]},${color[2]},${played ? 0.95 : 0.4})`;
       ctx.fillRect(c * step, cy - h / 2, bw, h);
     }
-  }, [w, env, overlaps, duration, progress, color]);
+  }, [w, env, progress, color]);
 
   return (
     <canvas

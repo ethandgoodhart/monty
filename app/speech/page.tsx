@@ -21,8 +21,8 @@ export const metadata: Metadata = {
 const HF_URL = "#access"; // TODO: Hugging Face dataset URL
 const CONTACT = "mailto:founders@trymonty.ai?subject=Monterey-100K%20access";
 const SECTIONS: [string, string][] = [
-  ["description", "Data description"],
   ["use", "Intended use"],
+  ["description", "Data description"],
   ["audio", "Audio metrics"],
   ["dynamics", "Conversational dynamics"],
   ["collection", "Collection method"],
@@ -85,8 +85,29 @@ export default function SpeechPage() {
             <Stat label="Speakers" value={String(s.speakers)} unit="unique" />
           </div>
 
+          <section id="use" className="yp-sec">
+            <Head n="01">Intended use</Head>
+            <div className="yp-uses">
+              <div>
+                <svg viewBox="0 0 24 16" className="yp-ico" aria-hidden="true"><rect x="0" y="4" width="24" height="2.4" rx="1.2" fill="#b9b7b0" /><rect x="0" y="9.6" width="24" height="2.4" rx="1.2" fill="#b9b7b0" /><rect x="10.8" y="0" width="2.4" height="16" rx="1.2" fill="var(--accent)" /></svg>
+                <h3>Speech-to-speech and full-duplex</h3>
+                <p>Both sides as independent signals on one timeline, with overlap, interruptions and turn-taking intact.</p>
+              </div>
+              <div>
+                <svg viewBox="0 0 24 16" className="yp-ico" aria-hidden="true"><circle cx="3" cy="10" r="2" fill="#b9b7b0" /><circle cx="10" cy="12" r="2" fill="#b9b7b0" /><circle cx="19" cy="4" r="2.6" fill="var(--accent)" /></svg>
+                <h3>Expressive TTS</h3>
+                <p>Spontaneous prosody on clean, isolated 48 kHz tracks, with laughter, fillers, emphasis and hesitation.</p>
+              </div>
+              <div>
+                <svg viewBox="0 0 24 16" className="yp-ico" aria-hidden="true"><rect x="0" y="4" width="2.2" height="8" fill="var(--accent)" /><rect x="4" y="1" width="2.2" height="14" fill="var(--accent)" /><rect x="8" y="5" width="2.2" height="6" fill="var(--accent)" /><rect x="13" y="4" width="11" height="2" fill="#b9b7b0" /><rect x="13" y="8" width="11" height="2" fill="#b9b7b0" /><rect x="13" y="12" width="7" height="2" fill="#b9b7b0" /></svg>
+                <h3>Turn-taking and audio understanding</h3>
+                <p>Unprompted speech with word-level transcripts, per-speaker voice activity and measured quality.</p>
+              </div>
+            </div>
+          </section>
+
           <section id="description" className="yp-sec">
-            <Head n="01">Data description</Head>
+            <Head n="02">Data description</Head>
             <p>
               Monterey-100K is a corpus of unscripted, multilingual two-speaker conversation, recorded full-duplex. Every
               participant is captured on their own microphone and delivered as a separate, sample-aligned 48 kHz track.
@@ -116,27 +137,6 @@ export default function SpeechPage() {
               <Row k="Metadata format"><code>.md</code> <code>.json</code> <small>UTF-8</small></Row>
               <Row k="Transcription type">ASR, word-level with timings</Row>
               <Row k="Review">Human, every conversation <small>edits logged against source time</small></Row>
-            </div>
-          </section>
-
-          <section id="use" className="yp-sec">
-            <Head n="02">Intended use</Head>
-            <div className="yp-uses">
-              <div>
-                <svg viewBox="0 0 24 16" className="yp-ico" aria-hidden="true"><rect x="0" y="4" width="24" height="2.4" rx="1.2" fill="#b9b7b0" /><rect x="0" y="9.6" width="24" height="2.4" rx="1.2" fill="#b9b7b0" /><rect x="10.8" y="0" width="2.4" height="16" rx="1.2" fill="var(--accent)" /></svg>
-                <h3>Speech-to-speech and full-duplex</h3>
-                <p>Both sides as independent signals on one timeline, with overlap, interruptions and turn-taking intact.</p>
-              </div>
-              <div>
-                <svg viewBox="0 0 24 16" className="yp-ico" aria-hidden="true"><circle cx="3" cy="10" r="2" fill="#b9b7b0" /><circle cx="10" cy="12" r="2" fill="#b9b7b0" /><circle cx="19" cy="4" r="2.6" fill="var(--accent)" /></svg>
-                <h3>Expressive TTS</h3>
-                <p>Spontaneous prosody on clean, isolated 48 kHz tracks, with laughter, fillers, emphasis and hesitation.</p>
-              </div>
-              <div>
-                <svg viewBox="0 0 24 16" className="yp-ico" aria-hidden="true"><rect x="0" y="4" width="2.2" height="8" fill="var(--accent)" /><rect x="4" y="1" width="2.2" height="14" fill="var(--accent)" /><rect x="8" y="5" width="2.2" height="6" fill="var(--accent)" /><rect x="13" y="4" width="11" height="2" fill="#b9b7b0" /><rect x="13" y="8" width="11" height="2" fill="#b9b7b0" /><rect x="13" y="12" width="7" height="2" fill="#b9b7b0" /></svg>
-                <h3>Turn-taking and audio understanding</h3>
-                <p>Unprompted speech with word-level transcripts, per-speaker voice activity and measured quality.</p>
-              </div>
             </div>
           </section>
 
