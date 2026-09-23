@@ -53,54 +53,38 @@ export default function SpeechPage() {
         <a className="yp-nav-cta" href={CONTACT}>Request access <Arrow /></a>
       </header>
 
-      <div className="yp-wide">
-        <section className="yp-hero">
-          <div className="yp-eyebrow">
-            <span>Dataset</span>
-            <span>Speech · two-channel conversation</span>
-            <span>Preview v0</span>
-          </div>
-          <h1>Monterey-100K</h1>
-          <div className="yp-hero-foot">
-            <p className="yp-sub">The world&rsquo;s largest multilingual 48 kHz channel-separated natural conversation dataset</p>
-            <div className="yp-hero-btns">
-              <a className="yp-btn yp-btn-dark" href={CONTACT}>Request access <Arrow /></a>
-              <a className="yp-btn" href={HF_URL}>Download on HuggingFace <span aria-hidden="true">↗</span></a>
-            </div>
-          </div>
-        </section>
-
-        <div className="yp-hero-art">
-          <Player clips={data.clips} />
-        </div>
-
-        <div className="yp-stats4">
-          <Stat label="Sample size" value="1" unit="hour" />
-          <Stat label="Sample rate" value="48" unit="kHz" />
-          <Stat label="Median overlap" value={(s.overlap_p50 * 100).toFixed(1)} unit="%" />
-          <Stat label="Speakers" value={String(s.speakers)} unit="unique" />
-        </div>
-
-        <section className="yp-scale" aria-labelledby="scale-h">
-          <div className="yp-scale-top">
-            <div className="yp-eyebrow"><span>Scale</span><span>1 dot = 1 hour</span></div>
-            <h2 id="scale-h">One hundred thousand hours of conversation.</h2>
-            <p>
-              Each dot is one hour of two-channel conversational audio, drawn at the same density in every cloud, so
-              volume tracks hours. Monterey-100K is 25&times; Seamless Interaction and 51&times; Fisher English.
-            </p>
-          </div>
-          <ScaleCloud />
-          <p className="yp-fn">
-            Switchboard-1 Release 2 (LDC97S62), Fisher English Training Parts 1 and 2 (LDC2004S13, LDC2005S13),
-            Seamless Interaction (Meta, 2025; includes 1,300 h of acted role-play). Monterey-100K shows the full
-            corpus; the preview measured on this page is 1 hour.
-          </p>
-        </section>
-      </div>
-
       <div className="yp-layout">
         <main className="yp-main">
+          <section className="yp-hero">
+            <div className="yp-hero-row">
+              <h1>Monterey-100K</h1>
+              <div className="yp-hero-btns">
+                <a className="yp-btn yp-btn-dark" href={CONTACT}>Request access <Arrow /></a>
+                <a className="yp-btn" href={HF_URL}>Download on HuggingFace <span aria-hidden="true">↗</span></a>
+              </div>
+            </div>
+            <p className="yp-sub">The world&rsquo;s largest multilingual 48 kHz channel-separated natural conversation dataset</p>
+          </section>
+
+          <section id="scale" className="yp-scale" aria-label="Scale">
+            <ScaleCloud />
+            <p className="yp-fn">
+              One dot = one hour of two-channel conversation. Sources: Switchboard-1 (LDC97S62), Fisher English Parts
+              1–2 (LDC2004S13, LDC2005S13), Seamless Interaction (Meta, 2025). The preview measured below is 1 hour.
+            </p>
+          </section>
+
+          <div className="yp-hero-art">
+            <Player clips={data.clips} />
+          </div>
+
+          <div className="yp-stats4">
+            <Stat label="Sample size" value="1" unit="hour" />
+            <Stat label="Sample rate" value="48" unit="kHz" />
+            <Stat label="Median overlap" value={(s.overlap_p50 * 100).toFixed(1)} unit="%" />
+            <Stat label="Speakers" value={String(s.speakers)} unit="unique" />
+          </div>
+
           <section id="description" className="yp-sec">
             <Head n="01">Data description</Head>
             <p>

@@ -31,7 +31,7 @@ function layout(w: number): Layout {
       x += 2 * ri + gap;
       return b;
     });
-    return { h: base + 88, balls, base: [base, base, base, base] };
+    return { h: base + 104, balls, base: [base, base, base, base] };
   }
   const k = Math.min(w * 0.42, 190) / CBRT[3];
   const r = CBRT.map((c) => c * k);
@@ -46,7 +46,7 @@ function layout(w: number): Layout {
     x += 2 * ri + gap;
     return b;
   });
-  return { h: big + 88, balls, base: [top, top, top, big] };
+  return { h: big + 100, balls, base: [top, top, top, big] };
 }
 
 const vertexShader = /* glsl */ `
@@ -74,7 +74,7 @@ const vertexShader = /* glsl */ `
     // Intro: points condense inward from a wide haze.
     float t = clamp((uIntro - aRand.x * 0.7 - aBall * 0.12) / 1.1, 0.0, 1.0);
     float e = 1.0 - pow(1.0 - t, 4.0);
-    vec3 p = mix(q * (1.6 + aRand.y * 2.2), q, e);
+    vec3 p = mix(q * (1.12 + aRand.y * 0.5), q, e);
 
     // uBall is in css px with y down; the ortho camera has y up.
     gl_Position = projectionMatrix * modelViewMatrix * vec4(b.x + p.x * b.z, -(b.y - p.y * b.z), p.z * b.z, 1.0);
@@ -190,7 +190,7 @@ export function ScaleCloud() {
       last = now;
       if (!reduced) {
         uniforms.uTime.value += dt;
-        if (started) uniforms.uIntro.value = Math.min(3, uniforms.uIntro.value + dt * 0.7);
+        if (started) uniforms.uIntro.value = Math.min(3, uniforms.uIntro.value + dt * 1.1);
       }
       renderer.render(scene, camera);
     };
