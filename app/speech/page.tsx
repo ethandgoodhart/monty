@@ -60,8 +60,7 @@ export default function SpeechPage() {
                   <a className="yp-btn" href={HF_URL}>Download on HuggingFace <span aria-hidden="true">↗</span></a>
                 </div>
               </div>
-              <p className="yp-sub">Channel-separated multilingual natural two-speaker conversations</p>
-              <a className="yp-under" href="#access">Up to 100,000 or more hours</a>
+              <p className="yp-sub">Unscripted multilingual conversations, every speaker on their own 48 kHz track, scaling to 100,000+ hours</p>
             </div>
             <div className="yp-hero-art">
               <Player clips={data.clips} />
