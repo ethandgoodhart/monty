@@ -115,11 +115,11 @@
 }
 .yp-toc {
   position: sticky;
-  top: 120px;
+  top: 136px;
   align-self: start;
   display: flex;
   flex-direction: column;
-  padding-top: 16px;
+  margin-top: 16px;
   border-left: 1px solid var(--line);
 }
 .yp-toc a {
