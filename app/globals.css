@@ -108,33 +108,6 @@ body {
   gap: 14px;
 }
 
-.sublink {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--fg-dim);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  text-decoration: none;
-  transition: color 0.25s ease;
-  animation: rise 1s 1.8s both ease-out;
-}
-
-.sublink svg {
-  transition: transform 0.25s ease;
-}
-
-@media (hover: hover) {
-  .sublink:hover {
-    color: var(--fg);
-  }
-
-  .sublink:hover svg {
-    transform: translateX(3px);
-  }
-}
-
 .cta {
   flex: none;
   display: inline-flex;
@@ -197,10 +170,6 @@ body {
     align-items: stretch;
   }
 
-  .sublink {
-    align-self: flex-start;
-  }
-
   .cta {
     justify-content: space-between;
   }
@@ -209,7 +178,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .nav,
   .wordmark,
-  .sublink,
   .cta {
     animation: none;
   }
